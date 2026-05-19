@@ -1,17 +1,31 @@
-import { Manipulative } from "./ui/Manipulative";
-import { Chat } from "./ui/Chat";
+import { GridView } from "./ui/GridView";
+import { Tray } from "./ui/Tray";
+import { RulesPanel } from "./ui/RulesPanel";
+import { Toolbar } from "./ui/Toolbar";
+import { MessagesPanel } from "./ui/MessagesPanel";
 
 export default function App() {
   return (
-    <div className="h-full w-full flex flex-col md:flex-row bg-slate-950">
-      <header className="md:hidden p-3 border-b border-slate-800 text-center">
-        <h1 className="text-amber-400 font-extrabold text-xl tracking-tight">Boxy Fractions</h1>
+    <div className="h-full w-full overflow-auto bg-slate-950 text-slate-100">
+      <header className="px-4 md:px-8 pt-5 pb-3 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-amber-400 font-extrabold text-2xl md:text-3xl tracking-tight">Boxy Fractions</h1>
+          <p className="text-slate-500 text-xs md:text-sm">
+            Drop pieces so colored sides satisfy their fraction rule. Tap a placed piece to remove it.
+          </p>
+        </div>
+        <Toolbar />
       </header>
-      <aside className="md:w-80 lg:w-96 md:h-full h-56 md:border-r border-b md:border-b-0 border-slate-800 flex flex-col">
-        <Chat />
-      </aside>
-      <main className="flex-1 flex items-center justify-center p-3 md:p-6 overflow-auto">
-        <Manipulative />
+
+      <main className="px-4 md:px-8 pb-8 flex flex-col lg:flex-row gap-6">
+        <section className="flex flex-col gap-4 flex-1 items-center lg:items-start">
+          <GridView />
+          <MessagesPanel />
+          <Tray />
+        </section>
+        <aside className="w-full lg:w-80 flex-shrink-0">
+          <RulesPanel />
+        </aside>
       </main>
     </div>
   );

@@ -1,36 +1,63 @@
-import { Fraction } from "./Fraction";
+import { Polyomino } from "./Polyomino";
+import type { Side } from "./Polyomino";
+import type { RuleColor } from "./Rule";
 
 /**
- * A draggable fraction piece. Each piece is one unit fraction (1/n) that visually
- * occupies that share of a Bar's width.
+ * Per-cell side colors for a Piece. For each cell of the polyomino, the four
+ * sides are either uncolored (null) or carry a RuleColor.
  *
- * The id is stable per fraction (e.g. id="quarter" for every 1/4) so the tray UI
- * doesn't need to track instances - the kid drags one out, it animates back, the
- * tray re-renders the same id-keyed slot. Placed pieces get a separate instanceId
- * in Bar.ts so React can tell two consecutive 1/4 placements apart.
+ * Convention: only EXTERNAL sides (sides that face outside the polyomino) ever
+ * carry a color. INTERNAL sides (where two cells of the same piece meet) are
+ * always null. This is enforced in Piece's constructor.
+ *
+ * Keyed by `${col},${row}` so it survives JSON round-trips and Set lookups.
  */
-export interface Piece {
+export type SideColorMap = ReadonlyMap<string, Readonly<Partial<Record<Side, RuleColor>>>>;
+
+/**
+ * A draggable game piece. Wraps a Polyomino with side colors.
+ *
+ * The piece's "square count" (which the hand-sketched concept shows as a small
+ * label on each tray piece) is just polyomino.size.
+ */
+export class Piece {
   readonly id: string;
-  readonly label: string;
-  readonly fraction: Fraction;
-  readonly color: string;
-}
+  readonly polyomino: Polyomino;
+  readonly sideColors: SideColorMap;
 
-export const PIECES: readonly Piece[] = [
-  { id: "half", label: "1/2", fraction: new Fraction(1, 2), color: "bg-amber-400" },
-  { id: "third", label: "1/3", fraction: new Fraction(1, 3), color: "bg-rose-400" },
-  { id: "quarter", label: "1/4", fraction: new Fraction(1, 4), color: "bg-sky-400" },
-  { id: "sixth", label: "1/6", fraction: new Fraction(1, 6), color: "bg-emerald-400" },
-];
-
-export function pieceById(id: string): Piece {
-  const p = PIECES.find((piece) => piece.id === id);
-  if (!p) {
-    throw new Error(
-      `Unknown piece id "${id}". Available: ${PIECES.map((x) => x.id).join(", ")}. ` +
-        `Bug: a UI component referenced a piece id that does not exist in PIECES. ` +
-        `Likely a typo in lesson script or in a drop handler.`,
-    );
+  constructor(id: string, polyomino: Polyomino, sideColors: SideColorMap) {
+    // Verify no internal side carries a color (would be a logic bug in the generator).
+    const externals = polyomino.externalSides();
+    for (const [cellKey, colors] of sideColors) {
+      const ext = externals.get(cellKey);
+      if (!ext) {
+        throw new Error(
+          `Piece ${id} has sideColors for cell ${cellKey} that does not exist in the polyomino. ` +
+            `Bug: the generator wrote a color for a cell that isn't part of this piece. Check the keys produced by the side-painter.`,
+        );
+      }
+      for (const side of Object.keys(colors) as Side[]) {
+        if (!ext.has(side)) {
+          throw new Error(
+            `Piece ${id} has a color on internal side ${side} of cell ${cellKey}. ` +
+              `Bug: only external sides (facing outside the polyomino) can carry rule colors. Verify the side-painter only colors external sides.`,
+          );
+        }
+      }
+    }
+    this.id = id;
+    this.polyomino = polyomino;
+    this.sideColors = sideColors;
   }
-  return p;
+
+  get squareCount(): number {
+    return this.polyomino.size;
+  }
+
+  colorOn(col: number, row: number, side: Side): RuleColor | null {
+    const key = `${col},${row}`;
+    const cellColors = this.sideColors.get(key);
+    if (!cellColors) return null;
+    return cellColors[side] ?? null;
+  }
 }

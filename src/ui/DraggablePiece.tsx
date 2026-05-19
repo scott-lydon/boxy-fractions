@@ -1,44 +1,47 @@
 import { motion } from "framer-motion";
+import { useRef } from "react";
 import type { Piece } from "../domain/Piece";
-import { pieceWidthPx } from "./sizing";
+import { PieceView } from "./PieceView";
+import { TRAY_CELL_PX, CELL_PX } from "./sizing";
+import { gridCellAtPoint } from "./dropTargets";
+import { useGameStore } from "../store/gameStore";
 
 /**
- * A single draggable fraction piece in the tray. Uses Framer Motion's drag
- * with snap-back-to-origin so the tray never empties - dragging is purely a
- * "place a piece" gesture, not "consume a piece."
+ * A piece in the tray that can be picked up and dragged onto the grid.
  *
- * Touch support: Framer Motion handles pointer events natively, which means
- * mouse on desktop and touch on iPad Safari work with the same code path. We
- * do NOT use HTML5 drag-and-drop because iOS Safari support is broken for
- * non-image draggables.
+ * During the drag, the piece visually scales up to the grid's cell size
+ * (CELL_PX) so the kid sees the same piece size as it will be on the grid.
+ * The hot-spot is the (0,0) cell - its top-left corner tracks the pointer.
+ *
+ * On drop we ask dropTargets.ts which grid cell the (0,0) corner is over and
+ * dispatch placePieceAt. If the placement is illegal, the store appends a
+ * warning message and the piece snaps back via dragSnapToOrigin.
  */
-export function DraggablePiece({
-  piece,
-  onDropAt,
-}: {
-  piece: Piece;
-  onDropAt: (x: number, y: number) => void;
-}) {
-  const width = pieceWidthPx(piece.fraction.valueAsDecimal());
+export function DraggablePiece({ piece }: { piece: Piece }) {
+  const placePieceAt = useGameStore((s) => s.placePieceAt);
+  const submitted = useGameStore((s) => s.submitted);
+  const ref = useRef<HTMLDivElement>(null);
+
   return (
     <motion.div
-      drag
+      ref={ref}
+      drag={!submitted}
       dragSnapToOrigin
       dragMomentum={false}
-      whileTap={{ scale: 1.05 }}
-      whileDrag={{ scale: 1.1, zIndex: 50, boxShadow: "0 12px 24px rgba(0,0,0,0.5)" }}
-      onDragEnd={(_, info) => onDropAt(info.point.x, info.point.y)}
-      className={[
-        piece.color,
-        "h-14 rounded-md flex items-center justify-center",
-        "text-slate-900 font-bold text-lg",
-        "cursor-grab active:cursor-grabbing",
-        "shadow-md border-2 border-slate-900/20",
-        "select-none",
-      ].join(" ")}
-      style={{ width, touchAction: "none" }}
+      whileTap={{ scale: 1.02 }}
+      whileDrag={{ scale: CELL_PX / TRAY_CELL_PX, zIndex: 50 }}
+      onDragEnd={(_, info) => {
+        // info.point is the pointer's viewport coords at drop. The (0,0) corner
+        // of the piece is offset from the pointer by half the cell since we want
+        // the kid's finger over a cell, not a corner.
+        const dropCell = gridCellAtPoint(info.point.x, info.point.y);
+        if (!dropCell) return;
+        placePieceAt(piece.id, dropCell.col, dropCell.row);
+      }}
+      style={{ touchAction: "none", cursor: submitted ? "default" : "grab" }}
+      className="select-none"
     >
-      {piece.label}
+      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount />
     </motion.div>
   );
 }
