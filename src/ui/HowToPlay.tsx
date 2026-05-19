@@ -106,10 +106,10 @@ const PAGES: React.ReactNode[] = [
   <div key="rules">
     <h3 className="text-slate-100 text-lg font-semibold mb-2">Read the rules</h3>
     <p className="text-slate-400 text-sm leading-relaxed mb-3">
-      Each rule is a color and a <em>smaller : larger box count</em> ratio.
-      The color is a hint about which rule was used when the puzzle was generated;
-      what matters at placement time is the ratio. So a green rule of{" "}
-      <span className="text-slate-200 font-mono">2/3</span> means:
+      Each rule is a color and a box-count ratio between two touching pieces.
+      Order doesn't matter — a 2-box piece next to a 3-box piece reads the
+      same as 3-box next to 2-box, both satisfy a green rule of{" "}
+      <span className="text-slate-200 font-mono">2:3</span>:
     </p>
     <div
       className="flex items-center gap-3 rounded-lg p-3"
