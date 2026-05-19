@@ -22,6 +22,7 @@ export function PieceView({
   faded = false,
   outlineColor = "#0f172a",
   outlineWidth = 2.5,
+  hideColors = false,
 }: {
   piece: Piece;
   cellPx: number;
@@ -29,6 +30,13 @@ export function PieceView({
   faded?: boolean;
   outlineColor?: string;
   outlineWidth?: number;
+  /**
+   * When true, the per-side colored triangles render as the neutral fill instead
+   * of the rule color. Used for tray pieces so the kid can't shape-and-color
+   * match their way to the answer. Colors reveal during drag and stay visible
+   * once placed.
+   */
+  hideColors?: boolean;
 }) {
   const { cols, rows } = piece.polyomino.bounds;
   const w = cols * cellPx;
@@ -68,7 +76,14 @@ export function PieceView({
       style={{ opacity: faded ? 0.45 : 1, overflow: "visible", touchAction: "none" }}
     >
       {piece.polyomino.cells.map((c) => (
-        <CellG key={`${c.col},${c.row}`} piece={piece} col={c.col} row={c.row} cellPx={cellPx} />
+        <CellG
+          key={`${c.col},${c.row}`}
+          piece={piece}
+          col={c.col}
+          row={c.row}
+          cellPx={cellPx}
+          hideColors={hideColors}
+        />
       ))}
       {outline.map((l, i) => (
         <line
@@ -107,11 +122,13 @@ function CellG({
   col,
   row,
   cellPx,
+  hideColors,
 }: {
   piece: Piece;
   col: number;
   row: number;
   cellPx: number;
+  hideColors: boolean;
 }) {
   const x0 = col * cellPx;
   const y0 = row * cellPx;
@@ -132,7 +149,7 @@ function CellG({
   return (
     <g>
       {sides.map(({ side, points }) => {
-        const color = piece.colorOn(col, row, side);
+        const color = !hideColors ? piece.colorOn(col, row, side) : null;
         const fill = color ? RULE_COLOR_FILL[color] : "#f8fafc";
         return <polygon key={side} points={points} fill={fill} stroke="rgba(15,23,42,0.18)" strokeWidth={0.5} />;
       })}

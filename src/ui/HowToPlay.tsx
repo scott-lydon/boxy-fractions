@@ -26,13 +26,14 @@ export function HowToPlay() {
           </p>
           <p>
             <span className="text-amber-400 font-semibold">2. The pieces.</span> Each piece is an irregular shape. The
-            number in the middle is its <em>square count</em>. The colored triangles on a cell's sides are the colors
-            that piece exposes on those sides.
+            number in the middle is its <em>square count</em>. <strong>The tray hides side colors on purpose</strong>
+            so you cannot shape-match your way to the answer. Pick a piece up to reveal its colors mid-drag, drop to
+            commit.
           </p>
           <p>
             <span className="text-amber-400 font-semibold">3. The rules.</span> Each color has a fraction in the rules
             panel. Top number is the placed piece's square count, bottom number is the new piece's. Equivalent ratios
-            also satisfy (so 2/5 is the same rule as 4/10).
+            also satisfy (so 2/5 is the same rule as 4/10). Reason about counts before you commit.
           </p>
           <p>
             <span className="text-amber-400 font-semibold">4. To place.</span> Drag a piece from the Parts tray onto
@@ -40,11 +41,17 @@ export function HowToPlay() {
             color AND the two pieces' counts must satisfy that color's rule.
           </p>
           <p>
-            <span className="text-amber-400 font-semibold">5. To undo.</span> Tap a placed piece to remove it. Anchors
+            <span className="text-amber-400 font-semibold">5. The grid has gaps.</span> The intended solution leaves
+            some cells empty, so 100% fill is not the goal and you cannot back into the answer by filling everything.
+            A higher fill score still means a better arrangement, so explore: there may be more than one valid
+            placement.
+          </p>
+          <p>
+            <span className="text-amber-400 font-semibold">6. To undo.</span> Tap a placed piece to remove it. Anchors
             can't be removed.
           </p>
           <p>
-            <span className="text-amber-400 font-semibold">6. Finish.</span> Hit <em>Submit</em> to score (filled
+            <span className="text-amber-400 font-semibold">7. Finish.</span> Hit <em>Submit</em> to score (filled
             percentage). <em>Reveal answer</em> shows one valid solution. <em>New round</em> rerolls.
           </p>
         </div>

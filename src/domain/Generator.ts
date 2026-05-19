@@ -244,15 +244,52 @@ export function generateRound(opts: {
   maxPieceSize?: number;
   seed?: number;
   anchorCount?: number;
+  /**
+   * Target fraction of grid cells that should be VOID (not part of the solution).
+   * Defaults to 0.25 so that ~25% of the grid is intentionally unfillable by the
+   * solution. This stops a kid from shape-matching their way to the answer.
+   */
+  voidFraction?: number;
 }): GeneratedRound {
   const cols = opts.cols;
   const rows = opts.rows;
   const maxSize = opts.maxPieceSize ?? 5;
   const seed = opts.seed ?? Math.floor(Math.random() * 0x7fffffff);
   const anchorCount = opts.anchorCount ?? 1;
+  const voidFraction = Math.min(0.6, Math.max(0, opts.voidFraction ?? 0.25));
   const rng = makeRng(seed);
 
-  const tiles = tile(cols, rows, maxSize, rng);
+  let tiles = tile(cols, rows, maxSize, rng);
+
+  // Reserve the anchor (largest tile) FIRST so it never gets dropped as a void.
+  const sortedByCount = [...tiles].sort((a, b) => b.cells.length - a.cells.length);
+  const anchorTilesPicked = sortedByCount.slice(0, anchorCount);
+  const anchorTileIds = new Set(anchorTilesPicked.map((t) => t.id));
+
+  // Drop random non-anchor tiles until we have ~voidFraction cells removed.
+  // Removed tiles become permanent gaps in the solution; the rules are derived
+  // only from adjacencies among the remaining tiles, so a kid placing pieces
+  // into the gap zone is fine as long as their color/rule contract holds with
+  // whatever they touch.
+  if (voidFraction > 0) {
+    const totalCells = cols * rows;
+    const targetVoid = Math.floor(totalCells * voidFraction);
+    const candidates = shuffle(
+      tiles.filter((t) => !anchorTileIds.has(t.id)),
+      rng,
+    );
+    const removed = new Set<number>();
+    let voidedCells = 0;
+    for (const t of candidates) {
+      if (voidedCells >= targetVoid) break;
+      // Avoid making any one removal blow past the target by 50%+ (keeps gaps small and spread out).
+      if (t.cells.length + voidedCells > targetVoid * 1.5) continue;
+      removed.add(t.id);
+      voidedCells += t.cells.length;
+    }
+    tiles = tiles.filter((t) => !removed.has(t.id));
+  }
+
   const adj = adjacencies(tiles, cols, rows);
   const rulesByKey = deriveRules(tiles, adj);
 
@@ -279,10 +316,16 @@ export function generateRound(opts: {
     });
   }
 
-  // Anchor: pick the largest tile so the kid has the most to work AROUND, not the largest piece to place.
-  const sortedByCount = [...tiles].sort((a, b) => b.cells.length - a.cells.length);
-  const anchorTiles = sortedByCount.slice(0, anchorCount);
-  const anchorIds = new Set(anchorTiles.map((t) => t.id));
+  // Anchor: the same tile(s) we reserved at the start. Re-resolve from the (possibly
+  // smaller) tiles list so the anchor object references match the surviving entries.
+  const anchorTiles = tiles.filter((t) => anchorTileIds.has(t.id));
+  const anchorIds = anchorTileIds;
+  if (anchorTiles.length === 0) {
+    throw new Error(
+      `Anchor tile disappeared after void removal. Bug: voidFraction removal dropped the reserved anchor. ` +
+        `Check the loop that builds the void set - it should never include anchorTileIds.`,
+    );
+  }
 
   const anchorPlacements: Placement[] = anchorTiles.map((t) => {
     const piece = piecesById.get(t.id)!;
