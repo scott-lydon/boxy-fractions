@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boxy Fractions — Architecture</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root {
+  --bg: #0a0e1a;
+  --panel: #1a2236;
+  --accent: #f59e0b;
+  --accent-2: #38bdf8;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+}
+body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
+.panel { background: var(--panel); border: 1px solid #2a3349; border-radius: 12px; padding: 1.25rem; }
+.panel h3 { color: var(--accent); }
+.tag { background: rgba(245,158,11,0.15); color: var(--accent); padding: 2px 10px; border-radius: 999px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+.subtle { color: var(--muted); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #2a3349; vertical-align: top; }
+th { color: var(--accent); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em; }
+nav a { color: var(--muted); }
+nav a:hover { color: var(--accent); }
+</style>
+</head>
+<body class="leading-relaxed">
+
+<nav class="sticky top-0 backdrop-blur bg-slate-950/80 border-b border-slate-800 z-50">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="font-extrabold text-amber-400">Boxy Fractions</div>
+    <div class="hidden md:flex gap-6 text-sm">
+      <a href="#hero">Overview</a>
+      <a href="#problem">Problem</a>
+      <a href="#topology">Topology</a>
+      <a href="#components">Components</a>
+      <a href="#flow">Data flow</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#tradeoffs">Trade-offs</a>
+      <a href="#stack">Stack</a>
+    </div>
+    <a href="https://boxy-fractions.onrender.com" class="text-amber-400 font-semibold text-sm">Live demo →</a>
+  </div>
+</nav>
+
+<header id="hero" class="max-w-6xl mx-auto px-6 py-16">
+  <span class="tag">Gauntlet Week 4 · Clone Synthesis Tutor</span>
+  <h1 class="text-5xl md:text-6xl font-extrabold mt-4 mb-3">Boxy Fractions</h1>
+  <p class="text-xl subtle max-w-3xl">A single Grade 4 math lesson on fraction equivalence. A 9-year-old loads it on an iPad in Safari, drags boxes onto bars, and discovers that 1/2 = 2/4 = 3/6.</p>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+    <div class="panel text-center"><div class="text-3xl font-extrabold text-amber-400">1</div><div class="subtle text-sm">Lesson</div></div>
+    <div class="panel text-center"><div class="text-3xl font-extrabold text-amber-400">6</div><div class="subtle text-sm">Stages</div></div>
+    <div class="panel text-center"><div class="text-3xl font-extrabold text-amber-400">4</div><div class="subtle text-sm">Unit fractions</div></div>
+    <div class="panel text-center"><div class="text-3xl font-extrabold text-amber-400">330 KB</div><div class="subtle text-sm">Total bundle</div></div>
+  </div>
+</header>
+
+<section id="problem" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">The problem and the shape of the answer</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="panel">
+      <h3 class="font-bold mb-2">Worksheet fractions</h3>
+      <p class="subtle text-sm">Kid sees "1/2 = ?/4" on paper. Has to remember that the denominator doubled, so the numerator doubles. No intuition is built. Three days later they cannot do it.</p>
+    </div>
+    <div class="panel">
+      <h3 class="font-bold mb-2">Boxy Fractions</h3>
+      <p class="subtle text-sm">Kid drags a 1/2 piece onto a bar. Drags two 1/4 pieces onto a second bar. Sees the bars line up. The tutor names what they already see. Now they own it.</p>
+    </div>
+  </div>
+</section>
+
+<section id="topology" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Topology</h2>
+  <div class="panel">
+    <div class="mermaid">
+graph TD
+  subgraph UI ["UI layer (React + Framer Motion)"]
+    Chat["Chat.tsx<br/>scripted tutor"]
+    Manip["Manipulative.tsx<br/>two bars + tray"]
+    Bar["BarRow.tsx<br/>drop target"]
+    Tray["Tray.tsx<br/>draggable pieces"]
+    Eq["EquivalencePanel<br/>reveal moment"]
+    Win["WinBanner<br/>end state"]
+  end
+  subgraph Store ["State (Zustand)"]
+    GS["gameStore.ts"]
+  end
+  subgraph Domain ["Domain (pure value types)"]
+    Frac["Fraction"]
+    BarD["Bar"]
+    Piece["Piece"]
+    Lesson["Lesson state machine"]
+  end
+  Chat --> GS
+  Manip --> GS
+  Bar --> GS
+  Tray --> GS
+  GS --> BarD
+  GS --> Lesson
+  BarD --> Frac
+  Piece --> Frac
+  Eq --> GS
+  Win --> GS
+  classDef ui fill:#1e293b,stroke:#f59e0b,color:#e2e8f0;
+  classDef store fill:#1e293b,stroke:#38bdf8,color:#e2e8f0;
+  classDef domain fill:#1e293b,stroke:#10b981,color:#e2e8f0;
+  class Chat,Manip,Bar,Tray,Eq,Win ui;
+  class GS store;
+  class Frac,BarD,Piece,Lesson domain;
+    </div>
+  </div>
+</section>
+
+<section id="components" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Per-component pros and cons</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+
+    <div class="panel">
+      <h3 class="font-bold">Fraction (value type)</h3>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+        <div>
+          <div class="text-emerald-400 font-semibold mb-1">Pros</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Normalizes sign at construction</li>
+            <li>equivalentTo() is cross-product, no allocation</li>
+            <li>simplified() returns a new instance, immutability stays clean</li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-rose-400 font-semibold mb-1">Cons</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Class instances cannot survive a JSON round-trip without a reviver</li>
+            <li>Number-typed numerator/denominator means integer-overflow is theoretically possible past 2^53</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="font-bold">Bar (immutable container)</h3>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+        <div>
+          <div class="text-emerald-400 font-semibold mb-1">Pros</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>wouldOverflow() is pure, callable from any handler</li>
+            <li>Throws on illegal placement with a stack trace that points back to the bug</li>
+            <li>filledFraction() simplifies once at the end</li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-rose-400 font-semibold mb-1">Cons</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Every placement allocates a new Bar (acceptable for 8-piece bars)</li>
+            <li>Order of pieces matters for rendering but not for math</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="font-bold">Lesson state machine</h3>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+        <div>
+          <div class="text-emerald-400 font-semibold mb-1">Pros</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Adding a stage is a new entry in the array</li>
+            <li>Click-advance and bar-fill-advance both supported</li>
+            <li>onEnterClearBars lets the script say "I cleared it" and have that be true</li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-rose-400 font-semibold mb-1">Cons</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Branching is linear today, no DAG support</li>
+            <li>No persistence between reloads</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="font-bold">Drag and drop (Framer + rect registry)</h3>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+        <div>
+          <div class="text-emerald-400 font-semibold mb-1">Pros</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Pointer events, so iPad Safari and desktop mouse share code</li>
+            <li>Rect-based hit testing is one tiny module</li>
+            <li>Snap-back on miss keeps the tray full</li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-rose-400 font-semibold mb-1">Cons</div>
+          <ul class="list-disc list-inside subtle space-y-1">
+            <li>Rect registry assumes no parent transform during drag</li>
+            <li>No keyboard alternative for accessibility (next iteration)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section id="flow" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Data flow on a drop</h2>
+  <div class="panel">
+    <div class="mermaid">
+sequenceDiagram
+  participant Kid as Kid (finger on iPad)
+  participant DP as DraggablePiece
+  participant BR as barRects (module)
+  participant ST as gameStore (Zustand)
+  participant BD as Bar domain
+  participant LE as Lesson state machine
+  participant UI as React tree
+  Kid->>DP: pointerdown + drag
+  DP->>DP: Framer Motion drag begins
+  Kid->>DP: pointerup
+  DP->>BR: findBarAtPoint(x, y)
+  BR-->>DP: barIndex or null
+  alt no hit
+    DP->>DP: dragSnapToOrigin animates back
+  else hit
+    DP->>ST: placePieceOnBar(pieceId, barIndex)
+    ST->>BD: wouldOverflow?
+    BD-->>ST: false
+    ST->>BD: withPiece(piece, instanceId)
+    BD-->>ST: new Bar
+    ST->>LE: checkAdvance(state)
+    LE->>BD: bar.filledFraction()
+    BD-->>LE: Fraction
+    LE->>LE: equivalentTo(targetFraction)?
+    alt match
+      LE->>ST: append success message, intro next stage
+    end
+    ST-->>UI: subscribers re-render
+  end
+    </div>
+  </div>
+</section>
+
+<section id="decisions" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Decisions</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Decision</th><th>Chose</th><th>Considered</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Drag system</td><td>Framer Motion (pointer events)</td><td>HTML5 drag-and-drop, react-dnd</td><td>iPad Safari touch parity with desktop mouse</td></tr>
+        <tr><td>State</td><td>Zustand</td><td>Redux, Context</td><td>One store, no providers, immutable updates</td></tr>
+        <tr><td>Tutor</td><td>Scripted dialogue</td><td>LLM</td><td>0 ms response, vetted content, brief allows it</td></tr>
+        <tr><td>Manipulative</td><td>Fraction bars (boxes)</td><td>Polyomino-placement game</td><td>Grade 4 kid reads a bar in 30 seconds</td></tr>
+        <tr><td>Host</td><td>Render Static Sites</td><td>Vercel, Cloudflare Pages</td><td>No phone-number at signup</td></tr>
+        <tr><td>Deploy trigger</td><td>Public-repo flow + manual deploy</td><td>GitHub App + auto-deploy</td><td>Five-day prototype, no auth flow needed</td></tr>
+        <tr><td>Styling</td><td>Tailwind v3</td><td>Tailwind v4, CSS modules</td><td>Most-documented, fewest gotchas with Vite 8</td></tr>
+        <tr><td>Hit testing</td><td>Rect registry</td><td>elementFromPoint, dnd-kit</td><td>Survives Framer's transform during drag</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="tradeoffs" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Trade-offs</h2>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="panel">
+      <h3 class="font-bold">No auto-deploy on push</h3>
+      <p class="subtle text-sm mt-2"><span class="text-emerald-400 font-semibold">Why I accept it:</span> Public-repo Render setup needs no GitHub OAuth flow; the kid does not care that I trigger deploys with one button click.</p>
+      <p class="subtle text-sm mt-2"><span class="text-rose-400 font-semibold">When it would bite:</span> If we iterate more than five times a day or want preview deploys per PR.</p>
+    </div>
+    <div class="panel">
+      <h3 class="font-bold">Bar manipulative, not polyomino game</h3>
+      <p class="subtle text-sm mt-2"><span class="text-emerald-400 font-semibold">Why I accept it:</span> Grade 4 kid reads a bar in 30 seconds. Polyomino takes two minutes to teach.</p>
+      <p class="subtle text-sm mt-2"><span class="text-rose-400 font-semibold">When it would bite:</span> If a hiring partner expects the more-novel manipulative to be the differentiator.</p>
+    </div>
+    <div class="panel">
+      <h3 class="font-bold">Manual test plan, not Vitest yet</h3>
+      <p class="subtle text-sm mt-2"><span class="text-emerald-400 font-semibold">Why I accept it:</span> 8 happy-path cases cover the lesson. Five days is not enough to build the suite AND ship.</p>
+      <p class="subtle text-sm mt-2"><span class="text-rose-400 font-semibold">When it would bite:</span> The second lesson lands and the cross-product of states explodes.</p>
+    </div>
+  </div>
+</section>
+
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Cost analysis</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="panel"><canvas id="costByComponent"></canvas></div>
+    <div class="panel"><canvas id="scaleProjection"></canvas></div>
+  </div>
+</section>
+
+<section id="stack" class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">Tech stack</h2>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="panel text-center"><div class="font-bold">Vite 8</div><div class="subtle text-xs">Build + dev server</div></div>
+    <div class="panel text-center"><div class="font-bold">React 19</div><div class="subtle text-xs">UI library</div></div>
+    <div class="panel text-center"><div class="font-bold">TypeScript 6</div><div class="subtle text-xs">Type system</div></div>
+    <div class="panel text-center"><div class="font-bold">Tailwind v3</div><div class="subtle text-xs">Styling</div></div>
+    <div class="panel text-center"><div class="font-bold">Framer Motion 12</div><div class="subtle text-xs">Drag + animation</div></div>
+    <div class="panel text-center"><div class="font-bold">Zustand 5</div><div class="subtle text-xs">State</div></div>
+    <div class="panel text-center"><div class="font-bold">Render</div><div class="subtle text-xs">Static hosting</div></div>
+    <div class="panel text-center"><div class="font-bold">GitHub</div><div class="subtle text-xs">Source of truth</div></div>
+  </div>
+</section>
+
+<footer class="max-w-6xl mx-auto px-6 py-12 border-t border-slate-800 text-center subtle text-sm">
+  Repo: <a class="text-amber-400" href="https://github.com/scott-lydon/boxy-fractions">github.com/scott-lydon/boxy-fractions</a> · Live: <a class="text-amber-400" href="https://boxy-fractions.onrender.com">boxy-fractions.onrender.com</a>
+</footer>
+
+<script>
+mermaid.initialize({ startOnLoad: true, theme: "dark", themeVariables: { primaryColor: "#1a2236", primaryTextColor: "#e2e8f0", primaryBorderColor: "#f59e0b", lineColor: "#94a3b8" }});
+
+new Chart(document.getElementById("costByComponent"), {
+  type: "bar",
+  data: {
+    labels: ["Render hosting", "GitHub repo", "Domain", "LLM tokens", "Analytics"],
+    datasets: [{ label: "Monthly USD", data: [0, 0, 0, 0, 0], backgroundColor: "#f59e0b" }]
+  },
+  options: { responsive: true, plugins: { title: { display: true, text: "Operating cost per month (free-tier today)", color: "#e2e8f0" }, legend: { labels: { color: "#e2e8f0" }}}, scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#2a3349" }}, y: { ticks: { color: "#94a3b8" }, grid: { color: "#2a3349" }, beginAtZero: true, max: 5 }}}
+});
+
+new Chart(document.getElementById("scaleProjection"), {
+  type: "line",
+  data: {
+    labels: ["100", "1k", "10k", "100k", "1M", "10M"],
+    datasets: [{ label: "USD / month", data: [0, 0, 0, 0, 7, 25], borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,0.2)", tension: 0.3 }]
+  },
+  options: { responsive: true, plugins: { title: { display: true, text: "Projected hosting cost vs concurrent kids (log)", color: "#e2e8f0" }, legend: { labels: { color: "#e2e8f0" }}}, scales: { x: { type: "logarithmic", ticks: { color: "#94a3b8" }, grid: { color: "#2a3349" }}, y: { ticks: { color: "#94a3b8" }, grid: { color: "#2a3349" }, beginAtZero: true }}}
+});
+</script>
+
+</body>
+</html>

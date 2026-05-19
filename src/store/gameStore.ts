@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { Bar } from "../domain/Bar";
-import { PIECES, pieceById } from "../domain/Piece";
-import type { Piece } from "../domain/Piece";
+import { pieceById } from "../domain/Piece";
 import { getStage } from "../domain/Lesson";
 import type { StageId } from "../domain/Lesson";
 
@@ -20,7 +19,6 @@ interface StoreData {
 }
 
 interface StoreActions {
-  availablePieces: () => Piece[];
   placePieceOnBar: (pieceId: string, barIndex: number) => void;
   clearBar: (barIndex: number) => void;
   acceptChoice: (label: string, reply: string, next: StageId) => void;
@@ -84,13 +82,8 @@ const initialData = (): StoreData => ({
   messageCounter: 0,
 });
 
-export const useGameStore = create<GameStore>((set, get) => ({
+export const useGameStore = create<GameStore>((set) => ({
   ...initialData(),
-
-  availablePieces: () => {
-    const stage = getStage(get().stage);
-    return PIECES.filter((p) => stage.availablePieceIds.includes(p.id));
-  },
 
   startLesson: () => {
     set((s) => {
