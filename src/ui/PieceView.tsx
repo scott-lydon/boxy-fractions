@@ -8,6 +8,10 @@ import { RULE_COLOR_FILL } from "../domain/Rule";
  * that carry a rule color render that triangle filled; internal seams and
  * uncolored external sides get a neutral fill.
  *
+ * Crucially, this also draws a THICK OUTLINE along the polyomino's external
+ * edges (not the rectangular bounding box). That way an L-shaped or T-shaped
+ * piece reads as L or T, with the concave corner clearly NOT part of the piece.
+ *
  * The piece's square count is rendered as a centered badge so the kid can see
  * "this is a 5-square piece" at a glance (matches the hand-sketched concept).
  */
@@ -16,17 +20,22 @@ export function PieceView({
   cellPx,
   showCount = true,
   faded = false,
+  outlineColor = "#0f172a",
+  outlineWidth = 2.5,
 }: {
   piece: Piece;
   cellPx: number;
   showCount?: boolean;
   faded?: boolean;
+  outlineColor?: string;
+  outlineWidth?: number;
 }) {
   const { cols, rows } = piece.polyomino.bounds;
   const w = cols * cellPx;
   const h = rows * cellPx;
 
-  // Find the bounding box centroid for the count badge.
+  // Centroid of actual cells (NOT bounding box). Skews the count badge into
+  // the polyomino's body rather than into a concave corner.
   let sumCol = 0;
   let sumRow = 0;
   for (const c of piece.polyomino.cells) {
@@ -35,6 +44,21 @@ export function PieceView({
   }
   const cx = (sumCol / piece.polyomino.cells.length) * cellPx;
   const cy = (sumRow / piece.polyomino.cells.length) * cellPx;
+
+  // External-edge segments. For each cell of the polyomino, for each of the 4
+  // sides, if the polyomino has NO cell in that direction, that side is on the
+  // outer boundary and gets a line.
+  const outline: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  for (const c of piece.polyomino.cells) {
+    const x0 = c.col * cellPx;
+    const y0 = c.row * cellPx;
+    const x1 = x0 + cellPx;
+    const y1 = y0 + cellPx;
+    if (!piece.polyomino.contains(c.col, c.row - 1)) outline.push({ x1: x0, y1: y0, x2: x1, y2: y0 });
+    if (!piece.polyomino.contains(c.col + 1, c.row)) outline.push({ x1: x1, y1: y0, x2: x1, y2: y1 });
+    if (!piece.polyomino.contains(c.col, c.row + 1)) outline.push({ x1: x0, y1: y1, x2: x1, y2: y1 });
+    if (!piece.polyomino.contains(c.col - 1, c.row)) outline.push({ x1: x0, y1: y0, x2: x0, y2: y1 });
+  }
 
   return (
     <svg
@@ -45,6 +69,18 @@ export function PieceView({
     >
       {piece.polyomino.cells.map((c) => (
         <CellG key={`${c.col},${c.row}`} piece={piece} col={c.col} row={c.row} cellPx={cellPx} />
+      ))}
+      {outline.map((l, i) => (
+        <line
+          key={i}
+          x1={l.x1}
+          y1={l.y1}
+          x2={l.x2}
+          y2={l.y2}
+          stroke={outlineColor}
+          strokeWidth={outlineWidth}
+          strokeLinecap="square"
+        />
       ))}
       {showCount && (
         <g pointerEvents="none">
@@ -98,10 +134,8 @@ function CellG({
       {sides.map(({ side, points }) => {
         const color = piece.colorOn(col, row, side);
         const fill = color ? RULE_COLOR_FILL[color] : "#f8fafc";
-        return <polygon key={side} points={points} fill={fill} stroke="rgba(15,23,42,0.25)" strokeWidth={0.5} />;
+        return <polygon key={side} points={points} fill={fill} stroke="rgba(15,23,42,0.18)" strokeWidth={0.5} />;
       })}
-      {/* Outer outline */}
-      <rect x={x0} y={y0} width={cellPx} height={cellPx} fill="none" stroke="rgba(15,23,42,0.6)" strokeWidth={1.5} />
     </g>
   );
 }

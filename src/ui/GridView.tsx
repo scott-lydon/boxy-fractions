@@ -71,7 +71,11 @@ export function GridView() {
           <div
             key={p.placementId}
             className="absolute"
-            style={{ left, top }}
+            style={{
+              left,
+              top,
+              cursor: !p.anchor && !submitted ? "pointer" : "default",
+            }}
             onClick={() => {
               if (!p.anchor && !submitted) removePlacement(p.placementId);
             }}
@@ -79,16 +83,13 @@ export function GridView() {
             aria-label={p.anchor ? "Anchor piece" : "Placed piece; tap to remove"}
             title={p.anchor ? "Starting piece" : "Tap to remove"}
           >
-            <div
-              style={{
-                outline: p.anchor ? "2px solid #f59e0b" : "none",
-                outlineOffset: -2,
-                borderRadius: 4,
-                cursor: !p.anchor && !submitted ? "pointer" : "default",
-              }}
-            >
-              <PieceView piece={p.piece} cellPx={CELL_PX} showCount />
-            </div>
+            <PieceView
+              piece={p.piece}
+              cellPx={CELL_PX}
+              showCount
+              outlineColor={p.anchor ? "#f59e0b" : "#0f172a"}
+              outlineWidth={p.anchor ? 3.5 : 2.5}
+            />
           </div>
         );
       })}

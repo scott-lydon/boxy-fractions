@@ -3,6 +3,7 @@ import { Tray } from "./ui/Tray";
 import { RulesPanel } from "./ui/RulesPanel";
 import { Toolbar } from "./ui/Toolbar";
 import { MessagesPanel } from "./ui/MessagesPanel";
+import { HowToPlay } from "./ui/HowToPlay";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
 
       <main className="px-4 md:px-8 pb-8 flex flex-col lg:flex-row gap-6">
         <section className="flex flex-col gap-4 flex-1 items-center lg:items-start">
+          <HowToPlay />
           <GridView />
           <MessagesPanel />
           <Tray />
