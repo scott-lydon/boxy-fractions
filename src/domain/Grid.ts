@@ -74,15 +74,7 @@ export class Grid {
       }
     | {
         ok: false;
-        reason: "color_mismatch";
-        col: number;
-        row: number;
-        side: Side;
-      }
-    | {
-        ok: false;
         reason: "rule_mismatch";
-        color: string;
         placedCount: number;
         newCount: number;
       } {
@@ -98,56 +90,41 @@ export class Grid {
       }
     }
 
-    // 2. For each external side that faces another placement, the colors must
-    //    match (both sides of the shared edge agree on which rule applies) AND
-    //    the rule must be satisfied by the two pieces' square counts.
+    // 2. For each adjacent neighbor (regardless of side color), the two pieces'
+    //    square counts must satisfy at least one rule's ratio. Colors on the
+    //    sides are descriptive hints, not constraints — that frees the student
+    //    from spinning pieces until colors line up, and forces them to reason
+    //    about the actual count ratio.
+    //
+    //    Adjacency is computed once per (this-piece, neighbor-piece) pair so we
+    //    don't fail a placement just because not every shared edge happens to
+    //    match a rule independently. If the ratio works, the placement works.
     let touchedSomething = false;
+    const neighborsSeen = new Set<string>();
     for (const cell of piece.polyomino.cells) {
       const absCol = origin.col + cell.col;
       const absRow = origin.row + cell.row;
-      // For each of the 4 sides of this cell, look at the neighbor in the grid.
       const sides: Side[] = ["N", "E", "S", "W"];
       for (const side of sides) {
-        const newColor = piece.colorOn(cell.col, cell.row, side);
         const { dcol, drow } = sideDelta(side);
         const neighbor = this.cellOccupier(absCol + dcol, absRow + drow);
         if (!neighbor) continue;
         touchedSomething = true;
-        // Find the matching cell in the neighbor placement so we can ask its color
-        // on the opposite side.
-        const neighborLocalCol = absCol + dcol - neighbor.origin.col;
-        const neighborLocalRow = absRow + drow - neighbor.origin.row;
-        const oppositeSide: Side = side === "N" ? "S" : side === "S" ? "N" : side === "E" ? "W" : "E";
-        const neighborColor = neighbor.piece.colorOn(neighborLocalCol, neighborLocalRow, oppositeSide);
-        if (!newColor || !neighborColor) {
-          // One side has no color, the other does -> mismatch.
-          if (newColor || neighborColor) {
-            return { ok: false, reason: "color_mismatch", col: absCol, row: absRow, side };
-          }
-          // both null = no rule on this edge; that's fine.
-          continue;
-        }
-        if (newColor !== neighborColor) {
-          return { ok: false, reason: "color_mismatch", col: absCol, row: absRow, side };
-        }
-        // Find the rule.
-        const rule = rules.find((r) => r.color === newColor);
-        if (!rule) {
-          throw new Error(
-            `Edge between (${absCol},${absRow}) and its ${side} neighbor is colored "${newColor}" but no Rule exists for that color. ` +
-              `Bug: a piece was painted with a color that has no rule entry. Check the generator's color-to-rule alignment.`,
-          );
-        }
-        if (
-          !ruleSatisfied(rule, neighbor.piece.squareCount, piece.squareCount) &&
-          !ruleSatisfied(rule, piece.squareCount, neighbor.piece.squareCount)
-        ) {
+        if (neighborsSeen.has(neighbor.placementId)) continue;
+        neighborsSeen.add(neighbor.placementId);
+        const placedCount = neighbor.piece.squareCount;
+        const newCount = piece.squareCount;
+        const ratioOk = rules.some(
+          (r) =>
+            ruleSatisfied(r, placedCount, newCount) ||
+            ruleSatisfied(r, newCount, placedCount),
+        );
+        if (!ratioOk) {
           return {
             ok: false,
             reason: "rule_mismatch",
-            color: newColor,
-            placedCount: neighbor.piece.squareCount,
-            newCount: piece.squareCount,
+            placedCount,
+            newCount,
           };
         }
       }

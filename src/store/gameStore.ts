@@ -21,6 +21,10 @@ interface StoreData {
   revealedSolution: boolean;
   submitted: boolean;
   score: number; // 0..100
+  // Ceiling % the player COULD reach if every piece in the round were placed.
+  // Round generator removes void tiles; this caps fill at < 100% so the player
+  // can see up-front what "perfect" looks like for this puzzle.
+  maxPossiblePercent: number;
 }
 
 interface StoreActions {
@@ -58,6 +62,24 @@ const DEFAULT_COLS = 6;
 const DEFAULT_ROWS = 5;
 const DEFAULT_MAX_PIECE_SIZE = 5;
 
+/**
+ * The most you could ever fill: every solution piece placed. The generator
+ * voids some tiles by design, so this is the puzzle's ceiling (< 100% on most
+ * rounds). Surfaced live in the toolbar so the player knows the target.
+ */
+function maxPossiblePercentFor(round: GeneratedRound): number {
+  let cells = 0;
+  for (const p of round.solutionPlacements) cells += p.piece.squareCount;
+  const total = round.cols * round.rows;
+  if (total === 0) {
+    throw new Error(
+      `Round has zero cells (cols=${round.cols}, rows=${round.rows}). ` +
+        `Bug: a round was generated with empty dimensions. Check the round generator inputs.`,
+    );
+  }
+  return Math.round((cells / total) * 100);
+}
+
 const initialData = (): StoreData => {
   const round = initialRound(DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_PIECE_SIZE);
   return {
@@ -68,7 +90,7 @@ const initialData = (): StoreData => {
       {
         id: "msg-1",
         kind: "info",
-        text: "Drag pieces from the tray onto the grid. Touching colors must satisfy the rule shown for that color.",
+        text: "Drag a piece from the tray onto the grid. Touching pieces must share one of the count ratios in the rules panel.",
       },
     ],
     messageCounter: 1,
@@ -76,6 +98,7 @@ const initialData = (): StoreData => {
     revealedSolution: false,
     submitted: false,
     score: 0,
+    maxPossiblePercent: maxPossiblePercentFor(round),
   };
 };
 
@@ -145,7 +168,7 @@ export const useGameStore = create<GameStore>((set) => ({
           {
             id: "msg-1",
             kind: "info",
-            text: "New round. Drag pieces from the tray onto the grid.",
+            text: "New round. Drag pieces so touching pieces share one of the count ratios in the rules panel.",
           },
         ],
         messageCounter: 1,
@@ -153,6 +176,7 @@ export const useGameStore = create<GameStore>((set) => ({
         revealedSolution: false,
         submitted: false,
         score: 0,
+        maxPossiblePercent: maxPossiblePercentFor(round),
       };
     });
   },
@@ -223,14 +247,18 @@ function explainReason(
 ): string {
   switch (r.reason) {
     case "out_of_bounds":
-      return "That piece goes off the edge of the grid.";
+      return "That piece would hang off the edge of the grid. Shift it so all of its boxes land inside.";
     case "overlap":
-      return `That spot is already taken (cell ${r.col}, ${r.row}).`;
+      // Common cause: the player dragged the piece so its TOP-LEFT box landed on
+      // a cell occupied by another piece (often the anchor itself). The whole
+      // piece's footprint has to fall on empty cells — drop the piece offset by
+      // a cell or two so the top-left clears the existing pieces.
+      return `Every box of the piece has to land on an empty cell. Cell (${r.col}, ${r.row}) is already taken — try shifting one cell over.`;
     case "no_adjacency":
-      return "Pieces must touch another piece. Try placing it next to an existing one.";
-    case "color_mismatch":
-      return "The colors don't match across that edge. Try another spot or rotate your strategy.";
+      return "Pieces must touch another piece. Place this one next to an existing piece.";
     case "rule_mismatch":
-      return `The ${r.color} rule says the ratio must be ${r.placedCount}:${r.newCount}-friendly, but those two pieces don't match.`;
+      // Show the bare ratio both ways so the student can match against the
+      // rules panel without having to know which order "counts".
+      return `Those two pieces would meet in a ${r.placedCount}:${r.newCount} ratio. No rule allows that ratio.`;
   }
 }
