@@ -12,9 +12,22 @@ export function HowToPlay() {
   const total = PAGES.length;
 
   return (
-    <div className="w-full max-w-3xl rounded-2xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-sm">
-      <div className="px-6 py-4 border-b border-slate-800/40 flex items-center justify-between">
-        <div className="text-amber-300/90 font-semibold text-sm uppercase tracking-[0.18em]">
+    <div
+      className="w-full max-w-3xl rounded-2xl"
+      style={{
+        background: "rgba(31, 41, 55, 0.45)",
+        backdropFilter: "blur(6px)",
+        boxShadow: "inset 0 0 0 1px rgba(212, 200, 178, 0.10)",
+      }}
+    >
+      <div
+        className="px-6 py-4 flex items-center justify-between"
+        style={{ borderBottom: "1px solid rgba(212, 200, 178, 0.08)" }}
+      >
+        <div
+          className="font-semibold text-sm uppercase tracking-[0.18em]"
+          style={{ color: "rgba(212, 200, 178, 0.75)" }}
+        >
           How to play
         </div>
         <div className="text-slate-500 text-xs font-mono">
@@ -34,7 +47,10 @@ export function HowToPlay() {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="px-6 py-4 border-t border-slate-800/40 flex items-center justify-between">
+      <div
+        className="px-6 py-4 flex items-center justify-between"
+        style={{ borderTop: "1px solid rgba(212, 200, 178, 0.08)" }}
+      >
         <button
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0}
@@ -49,7 +65,7 @@ export function HowToPlay() {
               onClick={() => setPage(i)}
               className="w-2 h-2 rounded-full transition-colors"
               style={{
-                background: i === page ? "#fcd34d" : "rgba(148,163,184,0.25)",
+                background: i === page ? "#e6c879" : "rgba(212, 200, 178, 0.20)",
               }}
               aria-label={`Page ${i + 1}`}
             />
@@ -58,7 +74,8 @@ export function HowToPlay() {
         <button
           onClick={() => setPage((p) => Math.min(total - 1, p + 1))}
           disabled={page === total - 1}
-          className="text-slate-200 hover:text-amber-300 disabled:opacity-30 text-sm font-semibold"
+          className="disabled:opacity-30 text-sm font-semibold"
+          style={{ color: "#e8d9a8" }}
         >
           Next →
         </button>
@@ -78,39 +95,50 @@ const PAGES: React.ReactNode[] = [
   </div>,
 
   <div key="pieces">
-    <h3 className="text-slate-100 text-lg font-semibold mb-2">The tray hides colors</h3>
+    <h3 className="text-slate-100 text-lg font-semibold mb-2">Read each piece</h3>
     <p className="text-slate-400 text-sm leading-relaxed">
-      Each tray piece shows its <em>shape</em> and a <em>count</em> (the number in the
-      middle). Colors stay hidden until you place the piece, so you cannot shape-match
-      the answer. You reason about <em>counts</em> first.
+      Each tray piece shows its <em>shape</em>, its colored sides, and a{" "}
+      <em>box count</em> (the number in the middle). The count is what the rules
+      are about: rules check the ratio of two touching pieces' counts.
     </p>
   </div>,
 
   <div key="rules">
     <h3 className="text-slate-100 text-lg font-semibold mb-2">Read the rules</h3>
     <p className="text-slate-400 text-sm leading-relaxed mb-3">
-      Each rule is a color and a ratio. Top number is the placed piece's count,
-      bottom is the new piece's. So <span className="text-slate-200 font-mono">2/3</span> means:
+      Each rule is a color and a <em>smaller : larger box count</em> ratio.
+      The color is a hint about which rule was used when the puzzle was generated;
+      what matters at placement time is the ratio. So a green rule of{" "}
+      <span className="text-slate-200 font-mono">2/3</span> means:
     </p>
-    <div className="flex items-center gap-3 bg-slate-900/60 rounded-lg p-3 border border-slate-800/60">
+    <div
+      className="flex items-center gap-3 rounded-lg p-3"
+      style={{
+        background: "rgba(20, 27, 41, 0.55)",
+        boxShadow: "inset 0 0 0 1px rgba(212, 200, 178, 0.10)",
+      }}
+    >
       <div className="flex flex-col items-center">
         <svg width="40" height="40" viewBox="0 0 40 40">
-          <rect x="0" y="0" width="40" height="20" fill="#f5efe3" stroke="rgba(148,163,184,0.4)" />
-          <rect x="0" y="20" width="40" height="20" fill="#f5efe3" stroke="rgba(148,163,184,0.4)" />
+          <rect x="0" y="0" width="40" height="40" fill="#f5efe3" />
+          <line x1="0" y1="20" x2="40" y2="20" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
         </svg>
-        <span className="text-slate-500 text-[10px] mt-1">2 squares</span>
+        <span className="text-slate-500 text-[10px] mt-1">2 boxes</span>
       </div>
       <div className="w-2 h-12 rounded" style={{ background: RULE_COLOR_FILL.green, opacity: 0.8 }} />
       <div className="flex flex-col items-center">
         <svg width="40" height="60" viewBox="0 0 40 60">
-          <rect x="0" y="0" width="40" height="20" fill="#f5efe3" stroke="rgba(148,163,184,0.4)" />
-          <rect x="0" y="20" width="40" height="20" fill="#f5efe3" stroke="rgba(148,163,184,0.4)" />
-          <rect x="0" y="40" width="40" height="20" fill="#f5efe3" stroke="rgba(148,163,184,0.4)" />
+          <rect x="0" y="0" width="40" height="60" fill="#f5efe3" />
+          <line x1="0" y1="20" x2="40" y2="20" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
+          <line x1="0" y1="40" x2="40" y2="40" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
         </svg>
-        <span className="text-slate-500 text-[10px] mt-1">3 squares</span>
+        <span className="text-slate-500 text-[10px] mt-1">3 boxes</span>
       </div>
       <div className="text-slate-300 text-xs leading-snug flex-1">
-        A 2-piece touches a 3-piece across a green edge. <span className="text-slate-500">Equivalent ratios work too (4/6, 6/9).</span>
+        A 2-box piece touching a 3-box piece satisfies the rule.{" "}
+        <span className="text-slate-500">
+          Equivalent ratios work: 4:6, 6:9, 8:12.
+        </span>
       </div>
     </div>
   </div>,
@@ -118,18 +146,18 @@ const PAGES: React.ReactNode[] = [
   <div key="place">
     <h3 className="text-slate-100 text-lg font-semibold mb-2">Place a piece</h3>
     <p className="text-slate-400 text-sm leading-relaxed">
-      Drag from the tray and drop on the grid. If the colors and counts line up
-      with every neighbor, it sticks. If not, it bounces back and a hint appears.
-      Tap any placed piece to remove it; anchors stay.
+      Drag from the tray and drop on the grid. The piece sticks if every piece
+      it touches makes a valid ratio with it (any rule). If not, it bounces back
+      with a hint. Tap a placed piece to remove it. Anchors stay put.
     </p>
   </div>,
 
   <div key="hints">
-    <h3 className="text-slate-100 text-lg font-semibold mb-2">Follow the glow</h3>
+    <h3 className="text-slate-100 text-lg font-semibold mb-2">Reach the ceiling</h3>
     <p className="text-slate-400 text-sm leading-relaxed">
-      Empty cells next to a placed colored side glow softly in that color. That
-      glow is your hint: the next piece you place there will need to expose that
-      color on the touching side, and its count must satisfy that color's rule.
+      The toolbar shows two percents: <em>filled</em> (updates as you place) and{" "}
+      <em>possible</em> (the ceiling for this round — most rounds have intentional
+      gaps, so the ceiling is usually below 100%). Aim for the ceiling, not for 100%.
     </p>
   </div>,
 ];
