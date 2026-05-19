@@ -18,8 +18,18 @@ export function Tray() {
   }
 
   return (
-    <div className="w-full max-w-3xl rounded-2xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-sm p-6">
-      <div className="text-amber-300/80 text-xs uppercase tracking-[0.18em] font-semibold mb-4">
+    <div
+      className="w-full max-w-3xl rounded-2xl p-6"
+      style={{
+        background: "rgba(31, 41, 55, 0.45)",
+        backdropFilter: "blur(6px)",
+        boxShadow: "inset 0 0 0 1px rgba(212, 200, 178, 0.10)",
+      }}
+    >
+      <div
+        className="text-xs uppercase tracking-[0.18em] font-semibold mb-4"
+        style={{ color: "rgba(212, 200, 178, 0.7)" }}
+      >
         Parts <span className="text-slate-500 ml-1">({pieces.length})</span>
       </div>
       <div className="flex flex-wrap gap-6 items-start">

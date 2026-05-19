@@ -10,11 +10,17 @@ export default function App() {
     <div className="h-full w-full overflow-auto text-slate-100">
       <header className="px-6 md:px-12 pt-8 pb-6 flex items-center justify-between gap-6 flex-wrap max-w-6xl mx-auto">
         <div>
-          <h1 className="text-slate-100 font-semibold text-3xl md:text-4xl tracking-tight">
-            Boxy <span className="text-amber-300">Fractions</span>
+          <h1
+            className="font-semibold text-3xl md:text-4xl tracking-tight"
+            style={{ color: "#e8e0cc" }}
+          >
+            Boxy{" "}
+            <span style={{ color: "#e6c879" /* dusty honey, matches yellow rule */ }}>
+              Fractions
+            </span>
           </h1>
-          <p className="text-slate-500 text-sm mt-1.5 max-w-md">
-            Drop pieces so colored sides satisfy each color's fraction rule.
+          <p className="text-sm mt-1.5 max-w-md" style={{ color: "rgba(212, 200, 178, 0.55)" }}>
+            Place pieces so touching pieces share one of the count ratios in the rules panel.
           </p>
         </div>
         <Toolbar />

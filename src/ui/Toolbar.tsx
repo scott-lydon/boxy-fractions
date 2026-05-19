@@ -1,12 +1,28 @@
 import { useGameStore } from "../store/gameStore";
 
+/**
+ * Toolbar with: New round, Submit, Reveal, plus a live two-line stat that
+ * shows BOTH the current fill (updates with every placement) and the ceiling
+ * possible for this round. The ceiling is computed from the generated
+ * solution; it is almost always < 100% because the round generator leaves
+ * intentional voids in the grid. Without showing the ceiling, "you got 77%"
+ * sounds like a failure when it might actually be perfect for this puzzle.
+ *
+ * Styling: dusty pastel palette to match the rules panel. Bright gradient
+ * amber was the previous look and clashed with the calm rule tiles next to it.
+ */
 export function Toolbar() {
   const newRound = useGameStore((s) => s.newRound);
   const revealSolution = useGameStore((s) => s.revealSolution);
   const submit = useGameStore((s) => s.submit);
   const submitted = useGameStore((s) => s.submitted);
-  const score = useGameStore((s) => s.score);
   const revealed = useGameStore((s) => s.revealedSolution);
+  const grid = useGameStore((s) => s.grid);
+  const max = useGameStore((s) => s.maxPossiblePercent);
+  const total = grid.cols * grid.rows;
+  let filled = 0;
+  for (const p of grid.placements) filled += p.piece.squareCount;
+  const current = total === 0 ? 0 : Math.round((filled / total) * 100);
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -14,9 +30,9 @@ export function Toolbar() {
         onClick={() => newRound()}
         className="px-5 py-2 rounded-full text-sm font-semibold transition-all"
         style={{
-          background: "linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%)",
-          color: "#0a0e1a",
-          boxShadow: "0 6px 16px rgba(245,158,11,0.25)",
+          background: "rgba(230, 200, 121, 0.18)",
+          color: "#e8d9a8",
+          boxShadow: "inset 0 0 0 1px rgba(230, 200, 121, 0.35)",
         }}
       >
         New round
@@ -24,11 +40,11 @@ export function Toolbar() {
       <button
         onClick={() => submit()}
         disabled={submitted || revealed}
-        className="px-5 py-2 rounded-full text-sm font-medium border transition-colors disabled:opacity-40"
+        className="px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-40"
         style={{
-          background: "rgba(30, 41, 59, 0.5)",
-          borderColor: "rgba(148, 163, 184, 0.25)",
-          color: "#e2e8f0",
+          background: "rgba(168, 198, 159, 0.14)",
+          color: "#c9d8c0",
+          boxShadow: "inset 0 0 0 1px rgba(168, 198, 159, 0.32)",
         }}
       >
         Submit
@@ -38,23 +54,42 @@ export function Toolbar() {
         disabled={revealed}
         className="px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-40"
         style={{
-          color: "#94a3b8",
+          color: "rgba(212, 200, 178, 0.6)",
         }}
       >
         Reveal answer
       </button>
-      {submitted && (
-        <div
-          className="px-4 py-1.5 rounded-full text-sm font-semibold tabular-nums"
-          style={{
-            background: "rgba(245, 158, 11, 0.12)",
-            border: "1px solid rgba(245, 158, 11, 0.35)",
-            color: "#fcd34d",
-          }}
-        >
-          {score}%
-        </div>
-      )}
+      <FillReadout current={current} max={max} />
+    </div>
+  );
+}
+
+/**
+ * Two stacked rows: live "filled" and the ceiling "possible". Both update on
+ * every placement (current) / on every new round (max).
+ */
+function FillReadout({ current, max }: { current: number; max: number }) {
+  return (
+    <div
+      className="px-4 py-2 rounded-2xl flex items-center gap-3 tabular-nums"
+      style={{
+        background: "rgba(31, 41, 55, 0.5)",
+        boxShadow: "inset 0 0 0 1px rgba(212, 200, 178, 0.18)",
+      }}
+    >
+      <div className="flex flex-col leading-tight">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">filled</span>
+        <span className="text-lg font-semibold" style={{ color: "#e8d9a8" }}>
+          {current}%
+        </span>
+      </div>
+      <div className="w-px h-8" style={{ background: "rgba(212, 200, 178, 0.15)" }} />
+      <div className="flex flex-col leading-tight">
+        <span className="text-[10px] uppercase tracking-wider text-slate-500">possible</span>
+        <span className="text-lg font-semibold" style={{ color: "rgba(212, 200, 178, 0.7)" }}>
+          {max}%
+        </span>
+      </div>
     </div>
   );
 }

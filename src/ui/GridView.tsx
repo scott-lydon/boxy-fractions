@@ -95,8 +95,13 @@ export function GridView() {
               piece={p.piece}
               cellPx={CELL_PX}
               showCount
-              outlineColor={p.anchor ? "rgba(245, 158, 11, 0.65)" : "rgba(148, 163, 184, 0.55)"}
-              outlineWidth={p.anchor ? 2.5 : 1.5}
+              // Pastel, dusty outlines that sit on the same palette as the rule
+              // tiles. The anchor used to wear a bright orange ring; that read
+              // as a warning at a glance. Dusty terracotta (paler than the
+              // rule's `orange`) keeps the "this one stays put" signal without
+              // shouting.
+              outlineColor={p.anchor ? "rgba(232, 168, 124, 0.55)" : "rgba(212, 200, 178, 0.45)"}
+              outlineWidth={p.anchor ? 1.75 : 1.25}
             />
           </div>
         );
