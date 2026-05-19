@@ -9,13 +9,17 @@ html, body, #root {
 }
 
 body {
-  background: #0a0e1a;
+  background:
+    radial-gradient(ellipse at top left, rgba(30, 41, 59, 0.7) 0%, transparent 55%),
+    radial-gradient(ellipse at bottom right, rgba(30, 41, 59, 0.55) 0%, transparent 60%),
+    #0a0e1a;
   color: #e2e8f0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+  font-feature-settings: "ss01", "cv01", "cv11";
 }
 
 button {

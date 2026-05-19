@@ -11,18 +11,18 @@ export function Tray() {
 
   if (pieces.length === 0) {
     return (
-      <div className="border border-dashed border-slate-700 rounded-md p-6 text-center text-slate-500 text-sm">
-        Tray is empty. Hit Submit to score or New Round for a new puzzle.
+      <div className="w-full max-w-3xl rounded-2xl border border-dashed border-slate-700/50 p-8 text-center text-slate-500 text-sm">
+        Tray is empty. Hit <em>Submit</em> to score or <em>New round</em> for a new puzzle.
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-md p-4">
-      <div className="text-slate-400 text-xs uppercase tracking-widest mb-3 font-semibold">
-        Parts ({pieces.length})
+    <div className="w-full max-w-3xl rounded-2xl border border-slate-800/60 bg-slate-900/40 backdrop-blur-sm p-6">
+      <div className="text-amber-300/80 text-xs uppercase tracking-[0.18em] font-semibold mb-4">
+        Parts <span className="text-slate-500 ml-1">({pieces.length})</span>
       </div>
-      <div className="flex flex-wrap gap-5 items-start">
+      <div className="flex flex-wrap gap-6 items-start">
         {pieces.map((p) => (
           <DraggablePiece key={p!.id} piece={p!} />
         ))}

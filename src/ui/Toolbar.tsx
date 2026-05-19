@@ -12,27 +12,47 @@ export function Toolbar() {
     <div className="flex items-center gap-3 flex-wrap">
       <button
         onClick={() => newRound()}
-        className="bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 px-4 py-2 rounded-full font-bold text-sm shadow"
+        className="px-5 py-2 rounded-full text-sm font-semibold transition-all"
+        style={{
+          background: "linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%)",
+          color: "#0a0e1a",
+          boxShadow: "0 6px 16px rgba(245,158,11,0.25)",
+        }}
       >
         New round
       </button>
       <button
         onClick={() => submit()}
         disabled={submitted || revealed}
-        className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:hover:bg-slate-700 text-slate-100 px-4 py-2 rounded-full font-bold text-sm shadow"
+        className="px-5 py-2 rounded-full text-sm font-medium border transition-colors disabled:opacity-40"
+        style={{
+          background: "rgba(30, 41, 59, 0.5)",
+          borderColor: "rgba(148, 163, 184, 0.25)",
+          color: "#e2e8f0",
+        }}
       >
         Submit
       </button>
       <button
         onClick={() => revealSolution()}
         disabled={revealed}
-        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-slate-800 text-slate-200 px-4 py-2 rounded-full text-sm border border-slate-600"
+        className="px-5 py-2 rounded-full text-sm font-medium transition-colors disabled:opacity-40"
+        style={{
+          color: "#94a3b8",
+        }}
       >
         Reveal answer
       </button>
       {submitted && (
-        <div className="ml-auto bg-amber-500/15 border border-amber-500/40 text-amber-300 px-3 py-1.5 rounded-full text-sm font-bold">
-          Score: {score}%
+        <div
+          className="px-4 py-1.5 rounded-full text-sm font-semibold tabular-nums"
+          style={{
+            background: "rgba(245, 158, 11, 0.12)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            color: "#fcd34d",
+          }}
+        >
+          {score}%
         </div>
       )}
     </div>

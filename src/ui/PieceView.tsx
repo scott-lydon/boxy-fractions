@@ -20,8 +20,8 @@ export function PieceView({
   cellPx,
   showCount = true,
   faded = false,
-  outlineColor = "#0f172a",
-  outlineWidth = 2.5,
+  outlineColor = "rgba(148, 163, 184, 0.45)",
+  outlineWidth = 1.5,
   hideColors = false,
 }: {
   piece: Piece;
@@ -99,15 +99,16 @@ export function PieceView({
       ))}
       {showCount && (
         <g pointerEvents="none">
-          <circle cx={cx} cy={cy} r={cellPx * 0.32} fill="rgba(15,23,42,0.92)" />
+          <circle cx={cx} cy={cy} r={cellPx * 0.3} fill="rgba(15, 23, 42, 0.85)" />
           <text
             x={cx}
             y={cy}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize={cellPx * 0.36}
-            fontWeight={800}
-            fill="#fef9c3"
+            fontSize={cellPx * 0.34}
+            fontWeight={700}
+            fill="#f5efe3"
+            style={{ letterSpacing: -0.5 }}
           >
             {piece.squareCount}
           </text>
@@ -150,8 +151,10 @@ function CellG({
     <g>
       {sides.map(({ side, points }) => {
         const color = !hideColors ? piece.colorOn(col, row, side) : null;
-        const fill = color ? RULE_COLOR_FILL[color] : "#f8fafc";
-        return <polygon key={side} points={points} fill={fill} stroke="rgba(15,23,42,0.18)" strokeWidth={0.5} />;
+        const fill = color ? RULE_COLOR_FILL[color] : "#f5efe3";
+        // No per-triangle border. Adjacent colors blend smoothly without a hairline
+        // between them, which gives the piece a calmer, more designed feel.
+        return <polygon key={side} points={points} fill={fill} />;
       })}
     </g>
   );

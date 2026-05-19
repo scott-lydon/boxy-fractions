@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { Piece } from "../domain/Piece";
 import { PieceView } from "./PieceView";
 import { TRAY_CELL_PX, CELL_PX } from "./sizing";
@@ -21,10 +21,6 @@ export function DraggablePiece({ piece }: { piece: Piece }) {
   const placePieceAt = useGameStore((s) => s.placePieceAt);
   const submitted = useGameStore((s) => s.submitted);
   const ref = useRef<HTMLDivElement>(null);
-  // Colors are hidden in the tray (so the kid cannot shape-and-color match)
-  // and reveal at drag-start so the kid sees what they are about to commit to
-  // mid-air. After release the placement keeps colors visible permanently.
-  const [dragging, setDragging] = useState(false);
 
   return (
     <motion.div
@@ -33,10 +29,8 @@ export function DraggablePiece({ piece }: { piece: Piece }) {
       dragSnapToOrigin
       dragMomentum={false}
       whileTap={{ scale: 1.02 }}
-      whileDrag={{ scale: CELL_PX / TRAY_CELL_PX, zIndex: 50 }}
-      onDragStart={() => setDragging(true)}
+      whileDrag={{ scale: CELL_PX / TRAY_CELL_PX, zIndex: 50, filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.4))" }}
       onDragEnd={(_, info) => {
-        setDragging(false);
         const dropCell = gridCellAtPoint(info.point.x, info.point.y);
         if (!dropCell) return;
         placePieceAt(piece.id, dropCell.col, dropCell.row);
@@ -44,7 +38,12 @@ export function DraggablePiece({ piece }: { piece: Piece }) {
       style={{ touchAction: "none", cursor: submitted ? "default" : "grab" }}
       className="select-none"
     >
-      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount hideColors={!dragging} />
+      {/* Colors are HIDDEN at all times in the tray, including during drag. The
+          kid commits a placement, then the colors reveal. Empty cells next to
+          placed colored sides glow in that color (see GridView's adjacency layer)
+          so the kid sees what color a candidate spot expects without seeing the
+          piece's color profile up front. */}
+      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount hideColors />
     </motion.div>
   );
 }

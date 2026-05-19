@@ -3,6 +3,7 @@ import { useGameStore } from "../store/gameStore";
 import { CELL_PX } from "./sizing";
 import { PieceView } from "./PieceView";
 import { setGridDropInfo, clearGridDropInfo } from "./dropTargets";
+import { AdjacencyGlow } from "./AdjacencyGlow";
 
 /**
  * The main play area. Renders the empty cells of the grid plus every placement
@@ -51,18 +52,25 @@ export function GridView() {
   return (
     <div
       ref={containerRef}
-      className="relative bg-slate-900 border border-slate-700 rounded-md"
-      style={{ width: w, height: h }}
+      className="relative rounded-2xl"
+      style={{
+        width: w,
+        height: h,
+        background:
+          "linear-gradient(160deg, rgba(30,41,59,0.7) 0%, rgba(15,23,42,0.85) 100%)",
+        boxShadow: "0 30px 60px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
+      }}
     >
-      {/* Empty-cell grid */}
+      {/* Empty-cell grid lines, very faint so the grid reads as quiet space. */}
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="absolute inset-0 pointer-events-none">
         {Array.from({ length: grid.cols + 1 }).map((_, i) => (
-          <line key={`v${i}`} x1={i * CELL_PX} y1={0} x2={i * CELL_PX} y2={h} stroke="rgba(148,163,184,0.18)" strokeWidth={1} />
+          <line key={`v${i}`} x1={i * CELL_PX} y1={0} x2={i * CELL_PX} y2={h} stroke="rgba(148,163,184,0.07)" strokeWidth={1} />
         ))}
         {Array.from({ length: grid.rows + 1 }).map((_, i) => (
-          <line key={`h${i}`} x1={0} y1={i * CELL_PX} x2={w} y2={i * CELL_PX} stroke="rgba(148,163,184,0.18)" strokeWidth={1} />
+          <line key={`h${i}`} x1={0} y1={i * CELL_PX} x2={w} y2={i * CELL_PX} stroke="rgba(148,163,184,0.07)" strokeWidth={1} />
         ))}
       </svg>
+      <AdjacencyGlow />
       {/* Placed pieces */}
       {grid.placements.map((p) => {
         const left = p.origin.col * CELL_PX;
@@ -87,8 +95,8 @@ export function GridView() {
               piece={p.piece}
               cellPx={CELL_PX}
               showCount
-              outlineColor={p.anchor ? "#f59e0b" : "#0f172a"}
-              outlineWidth={p.anchor ? 3.5 : 2.5}
+              outlineColor={p.anchor ? "rgba(245, 158, 11, 0.65)" : "rgba(148, 163, 184, 0.55)"}
+              outlineWidth={p.anchor ? 2.5 : 1.5}
             />
           </div>
         );
