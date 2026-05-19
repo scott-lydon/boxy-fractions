@@ -3,25 +3,30 @@ import type { Side } from "../domain/Polyomino";
 import { RULE_COLOR_FILL } from "../domain/Rule";
 
 /**
- * Pure-SVG renderer for a single Piece. Each cell of the polyomino is drawn as
- * a square divided into four triangles by the cell's diagonals. External sides
- * that carry a rule color render that triangle filled; internal seams and
- * uncolored external sides get a neutral fill.
+ * Pure-SVG renderer for a single Piece.
  *
- * Crucially, this also draws a THICK OUTLINE along the polyomino's external
- * edges (not the rectangular bounding box). That way an L-shaped or T-shaped
- * piece reads as L or T, with the concave corner clearly NOT part of the piece.
- *
- * The piece's square count is rendered as a centered badge so the kid can see
- * "this is a 5-square piece" at a glance (matches the hand-sketched concept).
+ * Layered rendering, in order:
+ *   1) A solid neutral square per cell. No diagonals drawn, ever, for cells
+ *      whose sides are all uncolored. (This is why the tray pieces no longer
+ *      show an "X" through every square.)
+ *   2) Subtle internal seams BETWEEN cells of the same polyomino. The student
+ *      can count cells without a heavy grid line breaking up the piece.
+ *   3) For each side that DOES carry a rule color, a single triangle from
+ *      the cell's two outer corners to the cell center, filled with that color.
+ *      The triangle/diagonal concept is what the student associates with a
+ *      colored edge — it only exists where color exists.
+ *   4) An external outline that traces the polyomino's silhouette (not the
+ *      rectangular bounding box), so an L-tetromino reads as L, not as a
+ *      rectangle with a notch.
+ *   5) A center badge with the piece's box count.
  */
 export function PieceView({
   piece,
   cellPx,
   showCount = true,
   faded = false,
-  outlineColor = "rgba(148, 163, 184, 0.45)",
-  outlineWidth = 1.5,
+  outlineColor = "rgba(212, 200, 178, 0.35)",
+  outlineWidth = 1.25,
   hideColors = false,
 }: {
   piece: Piece;
@@ -31,10 +36,9 @@ export function PieceView({
   outlineColor?: string;
   outlineWidth?: number;
   /**
-   * When true, the per-side colored triangles render as the neutral fill instead
-   * of the rule color. Used for tray pieces so the kid can't shape-and-color
-   * match their way to the answer. Colors reveal during drag and stay visible
-   * once placed.
+   * When true, suppress colored triangles entirely. Used historically for the
+   * tray. Default is false now — students see the colors so they can reason
+   * about the ratio before placing.
    */
   hideColors?: boolean;
 }) {
@@ -53,19 +57,39 @@ export function PieceView({
   const cx = (sumCol / piece.polyomino.cells.length) * cellPx;
   const cy = (sumRow / piece.polyomino.cells.length) * cellPx;
 
-  // External-edge segments. For each cell of the polyomino, for each of the 4
-  // sides, if the polyomino has NO cell in that direction, that side is on the
-  // outer boundary and gets a line.
+  // External outline segments (silhouette of the polyomino).
   const outline: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  // Internal seams: edges shared by two cells of THIS polyomino, drawn once.
+  const seams: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const seenSeam = new Set<string>();
   for (const c of piece.polyomino.cells) {
     const x0 = c.col * cellPx;
     const y0 = c.row * cellPx;
     const x1 = x0 + cellPx;
     const y1 = y0 + cellPx;
-    if (!piece.polyomino.contains(c.col, c.row - 1)) outline.push({ x1: x0, y1: y0, x2: x1, y2: y0 });
-    if (!piece.polyomino.contains(c.col + 1, c.row)) outline.push({ x1: x1, y1: y0, x2: x1, y2: y1 });
-    if (!piece.polyomino.contains(c.col, c.row + 1)) outline.push({ x1: x0, y1: y1, x2: x1, y2: y1 });
-    if (!piece.polyomino.contains(c.col - 1, c.row)) outline.push({ x1: x0, y1: y0, x2: x0, y2: y1 });
+    // Each side either bounds the outside (-> outline) or bounds a sibling cell
+    // (-> seam). Hash each edge by its two endpoints in canonical order so we
+    // don't draw it twice from the neighbor's perspective.
+    const edges: { side: Side; line: typeof outline[number] }[] = [
+      { side: "N", line: { x1: x0, y1: y0, x2: x1, y2: y0 } },
+      { side: "E", line: { x1: x1, y1: y0, x2: x1, y2: y1 } },
+      { side: "S", line: { x1: x0, y1: y1, x2: x1, y2: y1 } },
+      { side: "W", line: { x1: x0, y1: y0, x2: x0, y2: y1 } },
+    ];
+    for (const { side, line } of edges) {
+      const dc = side === "E" ? 1 : side === "W" ? -1 : 0;
+      const dr = side === "S" ? 1 : side === "N" ? -1 : 0;
+      const inside = piece.polyomino.contains(c.col + dc, c.row + dr);
+      if (inside) {
+        const key = `${Math.min(line.x1, line.x2)},${Math.min(line.y1, line.y2)}-${Math.max(line.x1, line.x2)},${Math.max(line.y1, line.y2)}`;
+        if (!seenSeam.has(key)) {
+          seenSeam.add(key);
+          seams.push(line);
+        }
+      } else {
+        outline.push(line);
+      }
+    }
   }
 
   return (
@@ -75,19 +99,46 @@ export function PieceView({
       viewBox={`0 0 ${w} ${h}`}
       style={{ opacity: faded ? 0.45 : 1, overflow: "visible", touchAction: "none" }}
     >
+      {/* Step 1: solid base square per cell. */}
       {piece.polyomino.cells.map((c) => (
-        <CellG
-          key={`${c.col},${c.row}`}
-          piece={piece}
-          col={c.col}
-          row={c.row}
-          cellPx={cellPx}
-          hideColors={hideColors}
+        <rect
+          key={`base-${c.col},${c.row}`}
+          x={c.col * cellPx}
+          y={c.row * cellPx}
+          width={cellPx}
+          height={cellPx}
+          fill="#f5efe3"
         />
       ))}
+      {/* Step 2: subtle internal seams between cells of the same polyomino. */}
+      {seams.map((l, i) => (
+        <line
+          key={`seam-${i}`}
+          x1={l.x1}
+          y1={l.y1}
+          x2={l.x2}
+          y2={l.y2}
+          stroke="rgba(120, 108, 88, 0.18)"
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          strokeLinecap="round"
+        />
+      ))}
+      {/* Step 3: colored triangle per colored side, only where color exists. */}
+      {!hideColors &&
+        piece.polyomino.cells.map((c) => (
+          <ColoredSides
+            key={`colors-${c.col},${c.row}`}
+            piece={piece}
+            col={c.col}
+            row={c.row}
+            cellPx={cellPx}
+          />
+        ))}
+      {/* Step 4: external polyomino outline. */}
       {outline.map((l, i) => (
         <line
-          key={i}
+          key={`out-${i}`}
           x1={l.x1}
           y1={l.y1}
           x2={l.x2}
@@ -97,9 +148,10 @@ export function PieceView({
           strokeLinecap="square"
         />
       ))}
+      {/* Step 5: count badge. */}
       {showCount && (
         <g pointerEvents="none">
-          <circle cx={cx} cy={cy} r={cellPx * 0.3} fill="rgba(15, 23, 42, 0.85)" />
+          <circle cx={cx} cy={cy} r={cellPx * 0.3} fill="rgba(31, 36, 47, 0.82)" />
           <text
             x={cx}
             y={cy}
@@ -118,18 +170,21 @@ export function PieceView({
   );
 }
 
-function CellG({
+/**
+ * For one cell, draw a triangle (cell corner -> cell corner -> cell center)
+ * for each side that actually carries a rule color. Uncolored sides draw
+ * nothing — the base square underneath shows through, no diagonal seam, no X.
+ */
+function ColoredSides({
   piece,
   col,
   row,
   cellPx,
-  hideColors,
 }: {
   piece: Piece;
   col: number;
   row: number;
   cellPx: number;
-  hideColors: boolean;
 }) {
   const x0 = col * cellPx;
   const y0 = row * cellPx;
@@ -137,24 +192,18 @@ function CellG({
   const y1 = y0 + cellPx;
   const cx = x0 + cellPx / 2;
   const cy = y0 + cellPx / 2;
-
-  // 4 triangles, one per side. Internal sides render with a soft neutral fill
-  // so the cell is visually solid even when uncolored.
   const sides: { side: Side; points: string }[] = [
     { side: "N", points: `${x0},${y0} ${x1},${y0} ${cx},${cy}` },
     { side: "E", points: `${x1},${y0} ${x1},${y1} ${cx},${cy}` },
     { side: "S", points: `${x1},${y1} ${x0},${y1} ${cx},${cy}` },
     { side: "W", points: `${x0},${y1} ${x0},${y0} ${cx},${cy}` },
   ];
-
   return (
     <g>
       {sides.map(({ side, points }) => {
-        const color = !hideColors ? piece.colorOn(col, row, side) : null;
-        const fill = color ? RULE_COLOR_FILL[color] : "#f5efe3";
-        // No per-triangle border. Adjacent colors blend smoothly without a hairline
-        // between them, which gives the piece a calmer, more designed feel.
-        return <polygon key={side} points={points} fill={fill} />;
+        const color = piece.colorOn(col, row, side);
+        if (!color) return null;
+        return <polygon key={side} points={points} fill={RULE_COLOR_FILL[color]} />;
       })}
     </g>
   );

@@ -38,12 +38,15 @@ export function DraggablePiece({ piece }: { piece: Piece }) {
       style={{ touchAction: "none", cursor: submitted ? "default" : "grab" }}
       className="select-none"
     >
-      {/* Colors are HIDDEN at all times in the tray, including during drag. The
-          kid commits a placement, then the colors reveal. Empty cells next to
-          placed colored sides glow in that color (see GridView's adjacency layer)
-          so the kid sees what color a candidate spot expects without seeing the
-          piece's color profile up front. */}
-      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount hideColors />
+      {/* Colors are SHOWN in the tray now. Hiding them was forcing the student
+          to drag pieces around until something stuck, which is the opposite of
+          thinking about the ratio. With the color-match constraint relaxed
+          (any color may meet any color as long as box counts hit a rule ratio),
+          showing colors gives the student a hint about WHICH ratio applied
+          when the puzzle was generated — useful but not load-bearing. The
+          adjacency glow on the grid still highlights empty cells next to
+          placed colored sides. */}
+      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount />
     </motion.div>
   );
 }
