@@ -161,18 +161,27 @@ function adjacencies(tiles: RawTile[], cols: number, rows: number): Map<number, 
 /** Build the rule list from the unique smaller/larger ratios across adjacent tiles. */
 function deriveRules(tiles: RawTile[], adj: Map<number, Set<number>>): Map<string, Rule> {
   const ratioKey = (a: number, b: number) => {
-    // smaller first
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     const g = gcd(lo, hi);
     return `${lo / g}/${hi / g}`;
   };
+  // Index by id, not array position, because the tiles list can be sparse after
+  // void removal. Looking up tiles[nbrId] by array index when a tile has been
+  // removed lands on the wrong neighbor (or undefined). This was the bug behind
+  // "Cannot read properties of undefined (reading 'cells')" on first deploy of
+  // the gaps-in-solution change.
+  const byId = new Map<number, RawTile>();
+  for (const t of tiles) byId.set(t.id, t);
+
   const seen = new Map<string, Rule>();
   let colorIdx = 0;
   for (const t of tiles) {
     for (const nbrId of adj.get(t.id)!) {
-      if (nbrId <= t.id) continue; // each pair once
-      const key = ratioKey(t.cells.length, tiles[nbrId].cells.length);
+      if (nbrId <= t.id) continue;
+      const nbr = byId.get(nbrId);
+      if (!nbr) continue; // neighbor was removed by void pass; no rule needed for this edge
+      const key = ratioKey(t.cells.length, nbr.cells.length);
       if (seen.has(key)) continue;
       const [num, den] = key.split("/").map((x) => parseInt(x, 10));
       const color: RuleColor = RULE_COLOR_PALETTE[colorIdx % RULE_COLOR_PALETTE.length];
@@ -200,13 +209,17 @@ function paintSides(
   rows: number,
   rulesByKey: Map<string, Rule>,
 ): SideColorMap {
+  // Build id->tile lookup once. Same reason as deriveRules: array-index lookup
+  // breaks when the tiles list is sparse after void removal.
+  const byId = new Map<number, RawTile>();
+  for (const t of tiles) byId.set(t.id, t);
+
   const occupied: number[][] = [];
   for (let r = 0; r < rows; r++) occupied.push(new Array(cols).fill(-1));
   for (const t of tiles) {
     for (const c of t.cells) occupied[c.row][c.col] = t.id;
   }
 
-  // Find the tile's own min col/row to convert absolute -> local.
   let minCol = Infinity;
   let minRow = Infinity;
   for (const c of tile.cells) {
@@ -220,12 +233,13 @@ function paintSides(
       const { dcol, drow } = sideDelta(s);
       const ncol = c.col + dcol;
       const nrow = c.row + drow;
-      if (ncol < 0 || nrow < 0 || ncol >= cols || nrow >= rows) continue; // boundary, no color
+      if (ncol < 0 || nrow < 0 || ncol >= cols || nrow >= rows) continue;
       const nbrId = occupied[nrow][ncol];
       if (nbrId === -1 || nbrId === tile.id) continue;
-      // ratio key
-      const lo = Math.min(tile.cells.length, tiles[nbrId].cells.length);
-      const hi = Math.max(tile.cells.length, tiles[nbrId].cells.length);
+      const nbr = byId.get(nbrId);
+      if (!nbr) continue;
+      const lo = Math.min(tile.cells.length, nbr.cells.length);
+      const hi = Math.max(tile.cells.length, nbr.cells.length);
       const g = gcd(lo, hi);
       const key = `${lo / g}/${hi / g}`;
       const rule = rulesByKey.get(key);
