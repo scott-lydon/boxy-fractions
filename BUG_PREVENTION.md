@@ -104,6 +104,36 @@ the direction explicitly: "placed boxes / new boxes = 3 / 5" with
 piece. No "larger / smaller" language. A unit test parses the rendered
 rule string and asserts both labels are present.
 
+### M3. Rule check is per-edge with "placed wins" — not "any rule's ratio anywhere works"
+
+**Issue (2026-05-20).** A 2-box piece with a purple side was placed
+first. Later a 2-box piece with a blue side was dropped next to it.
+The placement was accepted because 2:2 = 1:1 satisfies the blue rule,
+even though the placed neighbor's purple triangle was claiming "this
+seam is the 1:2 rule" (which 2:2 violates). Reported four times before
+it stuck — the old `canPlace` checked once per neighbor with "some
+rule's ratio works", which silently let a wrong-color seam through if
+any other rule happened to fit the same box counts.
+
+**Prevention.** `Grid.canPlace` walks every cell-side adjacency
+individually (not once per neighbor). For each shared edge:
+
+1. The placed neighbor's color on that edge is the authoritative rule
+   for the edge ("placed wins"). The new piece's color picks the rule
+   only when the placed side carries no color.
+2. The ratio is checked against ONLY that specific rule, not the full
+   rule set. Any-rule fallback is reserved for edges where neither
+   side carries a color.
+3. When colors differ at an edge but the placed-side rule IS satisfied,
+   the new piece's conflicting triangle is added to `edgesToClear` and
+   the placement pipeline trims those colors before storing the
+   placement. The seam visually agrees with the placed neighbor.
+
+Pinned by `Grid.test.ts`: five cases covering reject-on-violation,
+accept-with-clearing, accept-with-agreement, no-color any-rule
+fallback, and no-color no-rule rejection. Any future "rule simplifier"
+refactor must keep these passing.
+
 ### M2. Every puzzle must be solvable; verify by solving it programmatically before shipping
 
 **Issue (2026-05-18).** Rule said placed/new = 3/5; the only placeable
