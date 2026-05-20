@@ -34,6 +34,7 @@ interface StoreActions {
   newRound: (cols?: number, rows?: number, maxPieceSize?: number) => void;
   revealSolution: () => void;
   submit: () => void;
+  dismissMessages: () => void;
 }
 
 export type GameStore = StoreData & StoreActions;
@@ -51,7 +52,16 @@ function initialRound(cols: number, rows: number, maxPieceSize: number): Generat
   );
 }
 
+/**
+ * Appends a message. The panel only renders the latest one, so we deliberately
+ * REPLACE rather than stack when the same text fires consecutively — three
+ * identical "I think it might land another way..." messages stacked on top of
+ * each other was the bug this guards against. Different text from a previous
+ * message still appends so the player sees the new advice.
+ */
 function appendMessage(s: StoreData, kind: GameMessage["kind"], text: string): StoreData {
+  const last = s.messages[s.messages.length - 1];
+  if (last && last.text === text && last.kind === kind) return s;
   return {
     ...s,
     messages: [...s.messages, { id: `msg-${s.messageCounter + 1}`, kind, text }],
@@ -211,6 +221,14 @@ export const useGameStore = create<GameStore>((set) => ({
         messageCounter: s.messageCounter + 1,
       };
     });
+  },
+
+  dismissMessages: () => {
+    // Clear the entire stack. The panel only renders the latest message
+    // anyway, so dismissing what the player sees is equivalent to clearing
+    // all backing state — and prevents an old dismissed message reappearing
+    // if a render-only filter later changes.
+    set((s) => ({ ...s, messages: [] }));
   },
 
   submit: () => {
