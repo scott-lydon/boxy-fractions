@@ -82,18 +82,16 @@ function maxPossiblePercentFor(round: GeneratedRound): number {
 
 const initialData = (): StoreData => {
   const round = initialRound(DEFAULT_COLS, DEFAULT_ROWS, DEFAULT_MAX_PIECE_SIZE);
+  // No intro message in the panel: the header subtitle, rules panel, and
+  // How-to-play carousel already explain the goal. A third copy in the message
+  // panel was redundant chrome that competed with real, actionable feedback
+  // (placement errors, win confirmation) for the player's attention.
   return {
     round,
     grid: gridFromRound(round),
     trayPieceIds: round.trayPieces.map((p) => p.id),
-    messages: [
-      {
-        id: "msg-1",
-        kind: "info",
-        text: "Drag a piece from the tray onto the grid. Touching pieces must share one of the count ratios in the rules panel.",
-      },
-    ],
-    messageCounter: 1,
+    messages: [],
+    messageCounter: 0,
     placementCounter: 0,
     revealedSolution: false,
     submitted: false,
@@ -160,18 +158,15 @@ export const useGameStore = create<GameStore>((set) => ({
         rows ?? DEFAULT_ROWS,
         maxPieceSize ?? DEFAULT_MAX_PIECE_SIZE,
       );
+      // Same as initial: no intro message. The toolbar's filled/possible
+      // readout resets visibly when a new round starts, which is the only
+      // status the player needs.
       return {
         round,
         grid: gridFromRound(round),
         trayPieceIds: round.trayPieces.map((p) => p.id),
-        messages: [
-          {
-            id: "msg-1",
-            kind: "info",
-            text: "New round. Drag pieces so touching pieces share one of the count ratios in the rules panel.",
-          },
-        ],
-        messageCounter: 1,
+        messages: [],
+        messageCounter: 0,
         placementCounter: 0,
         revealedSolution: false,
         submitted: false,
