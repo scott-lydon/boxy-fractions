@@ -104,6 +104,43 @@ the direction explicitly: "placed boxes / new boxes = 3 / 5" with
 piece. No "larger / smaller" language. A unit test parses the rendered
 rule string and asserts both labels are present.
 
+### M4. Show consumed pieces; don't just message about them
+
+**Issue (2026-05-20).** Consume-on-fail was added so a wrong drop
+spent the piece. A yellow toast announced the loss, then disappeared.
+User: "I'm still only seeing the yellow warning when a part is
+misplaced, however, what I am expecting to see is what is in the
+drawing. I want there to be a 'dropped' basket which holds parts you
+dropped and can no longer use anymore." A state change the student
+cares about, but only telegraphed through a transient toast, reads as
+no change at all.
+
+**Prevention.** Whenever the model loses a unit of state the user
+cares about, that loss must appear as a persistent visual record, not
+just as a message. For Boxy: dropped pieces live in a Dropped basket
+beside the Parts basket. Same surface shape, same count-badge, but
+faded and non-interactive. Counter rule: every transient toast that
+announces a state delta should answer "where is that delta
+persistently visible in the UI?" — if the answer is "nowhere", the
+toast is hiding a bug.
+
+### M5. Mathematical readouts use the vocabulary the student is being taught
+
+**Issue (2026-05-20).** Toolbar showed "FILLED 37%" / "POSSIBLE 77%".
+User: "Also instead of percentages at the top I want that to be in
+fractions, because students might not be working in percentages yet."
+The game's entire mechanic is fractions — rules are ratios, pieces are
+box counts — and the top-line stat used percentages, which is a
+different unit and a more advanced concept.
+
+**Prevention.** Pick one mathematical vocabulary per learning context
+and use it everywhere. Boxy's vocabulary is fractions (count / total).
+Any readout that needs to summarize fill or progress uses N / total,
+not percentages, not ratios over an arbitrary base. If a future
+extension genuinely needs percentages (a leaderboard, an external
+metric, a CSV export), that is a separate display layer with its own
+explicit label, not a sneaky substitution in the live UI.
+
 ### M3. Rule check is per-edge with "placed wins" — not "any rule's ratio anywhere works"
 
 **Issue (2026-05-20).** A 2-box piece with a purple side was placed
