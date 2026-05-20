@@ -266,10 +266,17 @@ export const useGameStore = create<GameStore>((set) => ({
           anchor: false,
         })),
       );
+      // Reveal shows the answer — every solution piece lands on the grid,
+      // including ones the student previously dropped. Empty the Dropped
+      // basket so the student doesn't see the same piece in two states at
+      // once ("spent" in Dropped AND "shown" on the grid). The round is
+      // already terminal at this point; nothing else acts on
+      // droppedPieceIds until newRound or resetPlacements clears them.
       return {
         ...s,
         grid: newGrid,
         trayPieceIds: [],
+        droppedPieceIds: [],
         revealedSolution: true,
         messages: [
           ...s.messages,
