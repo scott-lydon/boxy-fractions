@@ -1,7 +1,20 @@
 import type { Piece } from "./Piece";
-import { sideDelta, type Side } from "./Polyomino";
-import type { Rule } from "./Rule";
+import { oppositeSide, sideDelta, type Side } from "./Polyomino";
+import type { Rule, RuleColor } from "./Rule";
 import { ruleSatisfied } from "./Rule";
+
+/**
+ * A reference to one (cell, side) on a piece, in the piece's LOCAL coordinate
+ * frame. canPlace returns a list of these to mark which colored triangles the
+ * caller should strip from the new piece before placing it — the "placed
+ * wins" rule means a new piece's conflicting triangle gets cleared at the
+ * seam where it lost to a placed neighbor's color.
+ */
+export interface EdgeRef {
+  readonly localCol: number;
+  readonly localRow: number;
+  readonly side: Side;
+}
 
 /**
  * A placement of a Piece on the grid: the piece, the grid-coords of its (0,0)
@@ -65,7 +78,7 @@ export class Grid {
     origin: { col: number; row: number },
     rules: readonly Rule[],
   ):
-    | { ok: true }
+    | { ok: true; edgesToClear: readonly EdgeRef[] }
     | { ok: false; reason: "out_of_bounds" }
     | { ok: false; reason: "overlap"; col: number; row: number }
     | {
@@ -77,6 +90,7 @@ export class Grid {
         reason: "rule_mismatch";
         placedCount: number;
         newCount: number;
+        edgeColor: RuleColor | null;
       } {
     const cells = Grid.cellsFor(piece, origin);
     // 1. In bounds and not overlapping.
@@ -90,17 +104,39 @@ export class Grid {
       }
     }
 
-    // 2. For each adjacent neighbor (regardless of side color), the two pieces'
-    //    square counts must satisfy at least one rule's ratio. Colors on the
-    //    sides are descriptive hints, not constraints — that frees the student
-    //    from spinning pieces until colors line up, and forces them to reason
-    //    about the actual count ratio.
+    // 2. Per-edge check. Each shared edge between the new piece and a placed
+    //    neighbor is its own contract:
     //
-    //    Adjacency is computed once per (this-piece, neighbor-piece) pair so we
-    //    don't fail a placement just because not every shared edge happens to
-    //    match a rule independently. If the ratio works, the placement works.
+    //     "Placed wins." The placed neighbor was here first and its colored
+    //     triangle at this seam is the authoritative rule for the seam. The
+    //     new piece must satisfy THAT specific rule's box-count ratio.
+    //
+    //     If the new piece carries a different color on its own side of the
+    //     seam — like a blue 2-box piece dropped next to a purple 2-box
+    //     piece — the new piece's color is irrelevant for the legality
+    //     check (placed's purple wins) AND the new piece's conflicting
+    //     triangle gets CLEARED on placement. The seam belongs to the
+    //     placed piece's color now, and the new piece visually agrees.
+    //     The list of edges to clear is returned to the caller so it can
+    //     build the trimmed piece for the placement.
+    //
+    //     If only one side is colored, that side picks the rule. If neither
+    //     is colored, any rule's ratio works (the permissive fallback for
+    //     seams the solution didn't paint).
+    //
+    //  Why per-edge instead of per-neighbor: a single (newPiece, neighbor)
+    //  pair can share multiple cell-edges, and those edges can carry
+    //  different colors. Lumping them into one per-neighbor check silently
+    //  let a wrong-color edge slip through if the box-count ratio happened
+    //  to satisfy SOME other rule. The bug that motivated this: a 2-box
+    //  piece with a blue side dropped next to a placed 2-box piece with a
+    //  purple side. 2:2 satisfied the blue rule (1:1) under the old
+    //  any-rule check, so the placement went through — but the placed
+    //  purple triangle was claiming "expect a 1:2 partner here," which
+    //  2:2 violates. Under placed-wins, the purple rule (1:2) is the only
+    //  one consulted, and the placement is rightly rejected.
     let touchedSomething = false;
-    const neighborsSeen = new Set<string>();
+    const edgesToClear: EdgeRef[] = [];
     for (const cell of piece.polyomino.cells) {
       const absCol = origin.col + cell.col;
       const absRow = origin.row + cell.row;
@@ -110,22 +146,79 @@ export class Grid {
         const neighbor = this.cellOccupier(absCol + dcol, absRow + drow);
         if (!neighbor) continue;
         touchedSomething = true;
-        if (neighborsSeen.has(neighbor.placementId)) continue;
-        neighborsSeen.add(neighbor.placementId);
+
+        // Color on the NEW piece's side of the edge (local coords).
+        const newColor = piece.colorOn(cell.col, cell.row, side);
+        // Color on the NEIGHBOR's side of the edge (local coords inside that
+        // placement). The side facing back is the opposite of `side`.
+        const nbrLocalCol = absCol + dcol - neighbor.origin.col;
+        const nbrLocalRow = absRow + drow - neighbor.origin.row;
+        const nbrColor = neighbor.piece.colorOn(
+          nbrLocalCol,
+          nbrLocalRow,
+          oppositeSide(side),
+        );
+
+        // Effective color picks the rule. Placed neighbor wins outright when
+        // both sides are colored OR only the placed side is colored. The new
+        // piece's color only picks the rule when the placed side has no
+        // color of its own.
+        const edgeColor: RuleColor | null = nbrColor ?? newColor;
         const placedCount = neighbor.piece.squareCount;
         const newCount = piece.squareCount;
-        const ratioOk = rules.some(
-          (r) =>
-            ruleSatisfied(r, placedCount, newCount) ||
-            ruleSatisfied(r, newCount, placedCount),
-        );
-        if (!ratioOk) {
-          return {
-            ok: false,
-            reason: "rule_mismatch",
-            placedCount,
-            newCount,
-          };
+
+        if (edgeColor) {
+          const rule = rules.find((r) => r.color === edgeColor);
+          if (!rule) {
+            // A color was painted on a piece for which no rule exists in this
+            // round. Generator invariant violation — surface explicitly so a
+            // future regression here doesn't silently let bad placements
+            // through as "no rule, no constraint."
+            throw new Error(
+              `Edge color ${edgeColor} has no matching rule in the round (rules: ${rules
+                .map((r) => r.color)
+                .join(", ")}). ` +
+                `Bug: the generator painted a piece with a color whose rule was not added to the round, ` +
+                `or rules were filtered after pieces were built. Check Generator.deriveRules / paintSides for symmetry.`,
+            );
+          }
+          const ratioOk =
+            ruleSatisfied(rule, placedCount, newCount) ||
+            ruleSatisfied(rule, newCount, placedCount);
+          if (!ratioOk) {
+            return {
+              ok: false,
+              reason: "rule_mismatch",
+              placedCount,
+              newCount,
+              edgeColor,
+            };
+          }
+          // Placed-wins clearing: the new piece carried a DIFFERENT color
+          // on its side of this seam. The legality check used placed's
+          // color (above); the visual cleanup is to clear the new piece's
+          // conflicting triangle so the seam reads as a single color. The
+          // new piece keeps every OTHER colored side it has (only this
+          // specific cell-side is cleared).
+          if (newColor && nbrColor && newColor !== nbrColor) {
+            edgesToClear.push({ localCol: cell.col, localRow: cell.row, side });
+          }
+        } else {
+          // No color on either side: any rule's ratio is acceptable.
+          const ratioOk = rules.some(
+            (r) =>
+              ruleSatisfied(r, placedCount, newCount) ||
+              ruleSatisfied(r, newCount, placedCount),
+          );
+          if (!ratioOk) {
+            return {
+              ok: false,
+              reason: "rule_mismatch",
+              placedCount,
+              newCount,
+              edgeColor: null,
+            };
+          }
         }
       }
     }
@@ -137,7 +230,7 @@ export class Grid {
       return { ok: false, reason: "no_adjacency" };
     }
 
-    return { ok: true };
+    return { ok: true, edgesToClear };
   }
 
   withPlacement(p: Placement): Grid {
