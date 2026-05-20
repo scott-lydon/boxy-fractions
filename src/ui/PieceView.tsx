@@ -110,7 +110,10 @@ export function PieceView({
           fill="#f5efe3"
         />
       ))}
-      {/* Step 2: subtle internal seams between cells of the same polyomino. */}
+      {/* Step 2: subtle internal seams between cells of the same polyomino.
+          Solid hairline a shade darker than the cell fill (#f5efe3 → #e3d9c2).
+          Dotted seams read as decorative; solid reads as a real boundary, which
+          is what we want the student to count along. */}
       {seams.map((l, i) => (
         <line
           key={`seam-${i}`}
@@ -118,10 +121,9 @@ export function PieceView({
           y1={l.y1}
           x2={l.x2}
           y2={l.y2}
-          stroke="rgba(120, 108, 88, 0.18)"
+          stroke="#e3d9c2"
           strokeWidth={1}
-          strokeDasharray="2 3"
-          strokeLinecap="round"
+          strokeLinecap="square"
         />
       ))}
       {/* Step 3: colored triangle per colored side, only where color exists. */}

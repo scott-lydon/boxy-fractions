@@ -97,9 +97,10 @@ const PAGES: React.ReactNode[] = [
   <div key="pieces">
     <h3 className="text-slate-100 text-lg font-semibold mb-2">Read each piece</h3>
     <p className="text-slate-400 text-sm leading-relaxed">
-      Each tray piece shows its <em>shape</em>, its colored sides, and a{" "}
-      <em>box count</em> (the number in the middle). The count is what the rules
-      are about: rules check the ratio of two touching pieces' counts.
+      Each tray piece shows its <em>shape</em> and a <em>box count</em> (the
+      number in the middle). Colors stay hidden in the tray so you cannot
+      shape-and-color match the answer; you reason about counts first. Colors
+      reveal once the piece is placed on the grid.
     </p>
   </div>,
 
@@ -121,7 +122,7 @@ const PAGES: React.ReactNode[] = [
       <div className="flex flex-col items-center">
         <svg width="40" height="40" viewBox="0 0 40 40">
           <rect x="0" y="0" width="40" height="40" fill="#f5efe3" />
-          <line x1="0" y1="20" x2="40" y2="20" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
+          <line x1="0" y1="20" x2="40" y2="20" stroke="#e3d9c2" />
         </svg>
         <span className="text-slate-500 text-[10px] mt-1">2 boxes</span>
       </div>
@@ -129,8 +130,8 @@ const PAGES: React.ReactNode[] = [
       <div className="flex flex-col items-center">
         <svg width="40" height="60" viewBox="0 0 40 60">
           <rect x="0" y="0" width="40" height="60" fill="#f5efe3" />
-          <line x1="0" y1="20" x2="40" y2="20" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
-          <line x1="0" y1="40" x2="40" y2="40" stroke="rgba(120,108,88,0.18)" strokeDasharray="2 3" />
+          <line x1="0" y1="20" x2="40" y2="20" stroke="#e3d9c2" />
+          <line x1="0" y1="40" x2="40" y2="40" stroke="#e3d9c2" />
         </svg>
         <span className="text-slate-500 text-[10px] mt-1">3 boxes</span>
       </div>

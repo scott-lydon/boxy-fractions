@@ -38,15 +38,16 @@ export function DraggablePiece({ piece }: { piece: Piece }) {
       style={{ touchAction: "none", cursor: submitted ? "default" : "grab" }}
       className="select-none"
     >
-      {/* Colors are SHOWN in the tray now. Hiding them was forcing the student
-          to drag pieces around until something stuck, which is the opposite of
-          thinking about the ratio. With the color-match constraint relaxed
-          (any color may meet any color as long as box counts hit a rule ratio),
-          showing colors gives the student a hint about WHICH ratio applied
-          when the puzzle was generated — useful but not load-bearing. The
-          adjacency glow on the grid still highlights empty cells next to
-          placed colored sides. */}
-      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount />
+      {/* Tray pieces hide their colors. If colors are visible in the tray, the
+          student picks the piece whose colored side matches the empty cell's
+          glow and never has to think about box counts. With colors hidden, the
+          only signal the student has at choosing time is the box-count badge,
+          which is exactly what the rules are about. Colors reveal once the
+          piece is placed.
+          (Earlier revision exposed tray colors; that was a regression of the
+          original design and is corrected here. See feedback memory
+          `feedback_boxy_tray_hide_colors`.) */}
+      <PieceView piece={piece} cellPx={TRAY_CELL_PX} showCount hideColors />
     </motion.div>
   );
 }
