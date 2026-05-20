@@ -25,8 +25,12 @@ export function PieceView({
   cellPx,
   showCount = true,
   faded = false,
-  outlineColor = "rgba(212, 200, 178, 0.35)",
-  outlineWidth = 1.25,
+  // Default outline matches the dark panel/page background so adjacent pieces
+  // — whether sitting side-by-side in the tray or touching on the grid —
+  // separate clearly via a visible dark gutter. Cream-on-cream silhouettes
+  // bled into each other, which is the visual problem this default fixes.
+  outlineColor = "#0a0e1a",
+  outlineWidth = 1.5,
   hideColors = false,
 }: {
   piece: Piece;
