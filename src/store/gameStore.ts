@@ -58,10 +58,16 @@ function initialRound(cols: number, rows: number, maxPieceSize: number): Generat
  * identical "I think it might land another way..." messages stacked on top of
  * each other was the bug this guards against. Different text from a previous
  * message still appends so the player sees the new advice.
+ *
+ * `win` is exempt from dedupe. A win message is an event ("the player just
+ * cleared the tray"), not a status; if the player removes the last piece and
+ * re-places it, the second clearance is a NEW event and must re-prompt the
+ * "Tap Submit to score" instruction. Dedupe by content alone silently swallowed
+ * that case before — flagged by qa-adversary as finding #1.
  */
 function appendMessage(s: StoreData, kind: GameMessage["kind"], text: string): StoreData {
   const last = s.messages[s.messages.length - 1];
-  if (last && last.text === text && last.kind === kind) return s;
+  if (kind !== "win" && last && last.text === text && last.kind === kind) return s;
   return {
     ...s,
     messages: [...s.messages, { id: `msg-${s.messageCounter + 1}`, kind, text }],
@@ -116,6 +122,14 @@ export const useGameStore = create<GameStore>((set) => ({
 
   placePieceAt: (pieceId, gridCol, gridRow) => {
     set((s) => {
+      // Terminal-state guards. After Submit or Reveal, the round is over: any
+      // further placement would corrupt the score or contradict the revealed
+      // solution. The UI disables the drag in those states, but a public action
+      // contract has to enforce its own preconditions — any future keyboard
+      // shortcut, programmatic test, or third-party drag library that bypasses
+      // the drag={!submitted} prop would otherwise silently mutate state.
+      // (qa-adversary findings #2 and #3.)
+      if (s.submitted || s.revealedSolution) return s;
       const piece = pieceById(s.round, pieceId);
       if (!piece) return appendMessage(s, "warn", `Unknown piece id ${pieceId}.`);
       if (!s.trayPieceIds.includes(pieceId)) {
@@ -156,6 +170,13 @@ export const useGameStore = create<GameStore>((set) => ({
 
   removePlacement: (placementId) => {
     set((s) => {
+      // Terminal-state guards. Once the round is over (Submit or Reveal), every
+      // placement on the board is part of the final state — pulling one back
+      // into the tray would either invalidate the score or contradict the
+      // displayed solution. (qa-adversary finding #4: after Reveal Answer,
+      // clicking any solution piece was removing it because revealed
+      // placements are stored with anchor:false.)
+      if (s.submitted || s.revealedSolution) return s;
       const placement = s.grid.placements.find((p) => p.placementId === placementId);
       if (!placement || placement.anchor) return s;
       const newGrid = s.grid.withoutPlacement(placementId);
