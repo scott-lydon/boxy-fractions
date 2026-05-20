@@ -35,6 +35,7 @@ interface StoreActions {
   revealSolution: () => void;
   submit: () => void;
   dismissMessages: () => void;
+  resetPlacements: () => void;
 }
 
 export type GameStore = StoreData & StoreActions;
@@ -240,6 +241,42 @@ export const useGameStore = create<GameStore>((set) => ({
           },
         ],
         messageCounter: s.messageCounter + 1,
+      };
+    });
+  },
+
+  resetPlacements: () => {
+    // Retry the SAME puzzle. Pulls every non-anchor placement off the grid,
+    // dumps the pieces back into the tray, and clears any terminal state so
+    // the player can try for a higher score. The anchor and the rule set stay
+    // intact — that's what makes this a retry, not a "new round" (which
+    // generates a fresh puzzle with new pieces and rules).
+    //
+    // Score, messages, and counters all reset because they describe a run, and
+    // the player is starting a new run on the same board.
+    set((s) => {
+      const anchors = s.grid.placements.filter((p) => p.anchor);
+      const removedIds: string[] = [];
+      for (const p of s.grid.placements) {
+        if (!p.anchor) removedIds.push(p.piece.id);
+      }
+      const newGrid = new Grid(s.grid.cols, s.grid.rows, anchors);
+      // Rebuild the tray from the round's full tray-piece list rather than
+      // appending removed ids — that way two consecutive resets cannot leak
+      // duplicate ids and the order matches a fresh round.
+      const trayPieceIds = s.round.trayPieces
+        .map((p) => p.id)
+        .filter((id) => removedIds.includes(id) || s.trayPieceIds.includes(id));
+      return {
+        ...s,
+        grid: newGrid,
+        trayPieceIds,
+        messages: [],
+        messageCounter: 0,
+        placementCounter: 0,
+        submitted: false,
+        revealedSolution: false,
+        score: 0,
       };
     });
   },

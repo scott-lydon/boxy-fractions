@@ -155,6 +155,48 @@ describe("gameStore.placePieceAt contract after terminal states", () => {
   });
 });
 
+describe("gameStore.resetPlacements", () => {
+  beforeEach(() => {
+    withSeededRound(12345);
+  });
+
+  it("returns every kid-placed piece to the tray, keeps the anchor, clears terminal state", () => {
+    const { round } = useGameStore.getState();
+    placeEverythingAtSolution();
+    const beforeReset = useGameStore.getState();
+    // Confirm pre-condition: some non-anchor placements exist.
+    expect(beforeReset.grid.placements.some((p) => !p.anchor)).toBe(true);
+    expect(beforeReset.trayPieceIds.length).toBe(0);
+    useGameStore.getState().submit();
+    expect(useGameStore.getState().submitted).toBe(true);
+
+    useGameStore.getState().resetPlacements();
+    const afterReset = useGameStore.getState();
+    // Only anchors remain on the grid.
+    expect(afterReset.grid.placements.every((p) => p.anchor)).toBe(true);
+    // Tray now contains the full round.trayPieces id set, in original order.
+    expect(afterReset.trayPieceIds.length).toBe(round.trayPieces.length);
+    expect(afterReset.trayPieceIds).toEqual(round.trayPieces.map((p) => p.id));
+    // Terminal state and run counters cleared.
+    expect(afterReset.submitted).toBe(false);
+    expect(afterReset.revealedSolution).toBe(false);
+    expect(afterReset.score).toBe(0);
+    expect(afterReset.messages).toEqual([]);
+    // The round itself is the same instance (same rules, same anchor piece).
+    expect(afterReset.round).toBe(beforeReset.round);
+    expect(afterReset.maxPossiblePercent).toBe(beforeReset.maxPossiblePercent);
+  });
+
+  it("is a no-op when nothing is placed", () => {
+    const before = useGameStore.getState();
+    useGameStore.getState().resetPlacements();
+    const after = useGameStore.getState();
+    // Anchor-only grid stays the same.
+    expect(after.grid.placements.length).toBe(before.grid.placements.length);
+    expect(after.trayPieceIds.length).toBe(before.trayPieceIds.length);
+  });
+});
+
 describe("gameStore.removePlacement on reveal results", () => {
   it("does not let the player remove a revealed (auto-placed) solution piece", () => {
     withSeededRound(12345);
