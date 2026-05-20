@@ -145,12 +145,34 @@ export const useGameStore = create<GameStore>((set) => ({
       // drop was on a valid empty cell.
       const snap = findBestOrigin(piece, { col: gridCol, row: gridRow }, s.grid, s.round.rules);
       if (!snap.ok) {
-        return appendMessage(s, "warn", softReason(snap.reason));
+        // Consume the piece on incorrect placement: the student dropped it on
+        // the grid in a spot the rules reject, so the piece is spent. This is
+        // the design switch from "every wrong drop bounces back to the tray
+        // and the student keeps trying until something sticks" to "every drop
+        // is a commitment — read the rules before you let go." The lesson is
+        // about reasoning before placing, not exhaustive retry-until-pass.
+        //
+        // Only on-grid rejections consume. A drag that releases outside the
+        // grid entirely never reaches placePieceAt (DraggablePiece returns
+        // early when gridCellAtPoint() is null), so it still snaps back. That
+        // way, releasing a piece you didn't really mean to drop (mid-thought,
+        // dragging it off the side, etc.) doesn't burn it.
+        const newTray = s.trayPieceIds.filter((id) => id !== pieceId);
+        const consumed = appendMessage(s, "warn", consumedReason(snap.reason));
+        return { ...consumed, trayPieceIds: newTray };
       }
+      // Placed-wins cleanup: at every seam where the new piece's color
+      // differs from the placed neighbor's, the new piece's triangle gets
+      // cleared (placed neighbor's color is the seam's authoritative rule
+      // and the legality check used it; we now make the visual agree). The
+      // piece is otherwise identical — same id, same shape, same colors on
+      // every non-conflicting side.
+      const placedPiece =
+        snap.edgesToClear.length === 0 ? piece : piece.withClearedColors(snap.edgesToClear);
       const placementId = `placement-${s.placementCounter + 1}`;
       const placement: Placement = {
         placementId,
-        piece,
+        piece: placedPiece,
         origin: snap.origin,
         anchor: false,
       };
@@ -335,9 +357,15 @@ function pieceById(round: GeneratedRound, id: string): Piece | undefined {
  * math is the thing the player should think about). Returns the chosen reason
  * for the caller to phrase.
  */
-type CanPlaceFail = Exclude<ReturnType<Grid["canPlace"]>, { ok: true }>;
+type CanPlaceResult = ReturnType<Grid["canPlace"]>;
+type CanPlaceOk = Extract<CanPlaceResult, { ok: true }>;
+type CanPlaceFail = Exclude<CanPlaceResult, { ok: true }>;
 type SnapResult =
-  | { ok: true; origin: { col: number; row: number } }
+  | {
+      ok: true;
+      origin: { col: number; row: number };
+      edgesToClear: CanPlaceOk["edgesToClear"];
+    }
   | { ok: false; reason: CanPlaceFail };
 
 function findBestOrigin(
@@ -355,7 +383,11 @@ function findBestOrigin(
   centroidCol /= piece.polyomino.cells.length;
   centroidRow /= piece.polyomino.cells.length;
 
-  let bestOk: { origin: { col: number; row: number }; dist: number } | null = null;
+  let bestOk: {
+    origin: { col: number; row: number };
+    dist: number;
+    edgesToClear: CanPlaceOk["edgesToClear"];
+  } | null = null;
   const fails: CanPlaceFail[] = [];
 
   for (const local of piece.polyomino.cells) {
@@ -369,15 +401,20 @@ function findBestOrigin(
       const dx = absCentroidCol - dropCell.col;
       const dy = absCentroidRow - dropCell.row;
       const dist = dx * dx + dy * dy;
-      if (!bestOk || dist < bestOk.dist) bestOk = { origin, dist };
+      if (!bestOk || dist < bestOk.dist) {
+        bestOk = { origin, dist, edgesToClear: r.edgesToClear };
+      }
     } else {
       fails.push(r);
     }
   }
-  if (bestOk) return { ok: true, origin: bestOk.origin };
+  if (bestOk) {
+    return { ok: true, origin: bestOk.origin, edgesToClear: bestOk.edgesToClear };
+  }
 
-  // Rank rejection reasons so we surface the most-useful one. rule_mismatch is
-  // about the math (the actual puzzle), so it outranks geometric reasons.
+  // Rank rejection reasons so we surface the most-useful one. rule_mismatch
+  // is about the puzzle math (the actual thing the student should reason
+  // about), so it outranks geometric reasons.
   const priority: Record<CanPlaceFail["reason"], number> = {
     rule_mismatch: 0,
     overlap: 1,
@@ -389,19 +426,44 @@ function findBestOrigin(
 }
 
 /**
- * Suggestion-voice copy. Treats every rejection as "try another way" rather
- * than "you failed." Pedagogical: a 7th-grader sees yellow and reads
- * "I think it might be another way", not red and "you got it wrong."
+ * Copy for a CONSUMED placement: the piece has been spent, so the message
+ * names what went wrong and adds the "that piece is now used up" tag. No
+ * "try this piece again" language — the piece is gone.
+ *
+ * Kept in suggestion-voice rather than blame-voice ("I think it landed
+ * another way" rather than "you placed it wrong") so a 7th-grader reads it
+ * as guidance, not punishment.
  */
-function softReason(r: CanPlaceFail): string {
+function consumedReason(r: CanPlaceFail): string {
+  const tail = " That piece is used up now. Read the rules before you place the next one.";
   switch (r.reason) {
     case "rule_mismatch":
-      return `I think it might land another way — those two pieces would meet in a ${r.placedCount}:${r.newCount} ratio, and no rule in the panel allows that. Try a different piece, or a spot next to a different piece.`;
+      if (r.edgeColor) {
+        return (
+          `I think it landed another way — that seam was a ${r.edgeColor} edge, and the ` +
+          `${r.placedCount}:${r.newCount} ratio doesn't match the ${r.edgeColor} rule.` +
+          tail
+        );
+      }
+      return (
+        `I think it landed another way — those two pieces would meet in a ${r.placedCount}:${r.newCount} ` +
+        `ratio, and no rule in the panel allows that.` +
+        tail
+      );
     case "overlap":
-      return "I think it might fit another way — every box of the piece has to land on an empty cell, and at least one of these would overlap. Try a spot a cell over.";
+      return (
+        "I think it landed another way — at least one of its boxes covered a cell that already had a piece." +
+        tail
+      );
     case "no_adjacency":
-      return "I think it might fit another way — pieces have to touch one already on the grid. Try a spot next to an existing piece.";
+      return (
+        "I think it landed another way — pieces have to touch one already on the grid, and this one didn't." +
+        tail
+      );
     case "out_of_bounds":
-      return "I think it might fit another way — at least one box would land off the grid no matter how I align this piece. Try a spot further inside.";
+      return (
+        "I think it landed another way — at least one box would have gone off the grid." +
+        tail
+      );
   }
 }
