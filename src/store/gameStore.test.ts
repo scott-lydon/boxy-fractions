@@ -21,17 +21,15 @@ function withSeededRound(seed: number, opts: { cols?: number; rows?: number; max
     round,
     grid: gridFromRound(round),
     trayPieceIds: round.trayPieces.map((p) => p.id),
+    droppedPieceIds: [],
     messages: [],
     messageCounter: 0,
     placementCounter: 0,
     revealedSolution: false,
     submitted: false,
     score: 0,
-    maxPossiblePercent:
-      Math.round(
-        (round.solutionPlacements.reduce((acc, p) => acc + p.piece.squareCount, 0) /
-          (round.cols * round.rows)) * 100,
-      ),
+    totalCells: round.cols * round.rows,
+    possibleCells: round.solutionPlacements.reduce((acc, p) => acc + p.piece.squareCount, 0),
   });
   return round;
 }
@@ -184,7 +182,11 @@ describe("gameStore.resetPlacements", () => {
     expect(afterReset.messages).toEqual([]);
     // The round itself is the same instance (same rules, same anchor piece).
     expect(afterReset.round).toBe(beforeReset.round);
-    expect(afterReset.maxPossiblePercent).toBe(beforeReset.maxPossiblePercent);
+    expect(afterReset.totalCells).toBe(beforeReset.totalCells);
+    expect(afterReset.possibleCells).toBe(beforeReset.possibleCells);
+    // Reset also empties the Dropped basket — it's part of "retry the same
+    // puzzle from scratch."
+    expect(afterReset.droppedPieceIds).toEqual([]);
   });
 
   it("is a no-op when nothing is placed", () => {
@@ -194,6 +196,59 @@ describe("gameStore.resetPlacements", () => {
     // Anchor-only grid stays the same.
     expect(after.grid.placements.length).toBe(before.grid.placements.length);
     expect(after.trayPieceIds.length).toBe(before.trayPieceIds.length);
+  });
+});
+
+describe("gameStore.placePieceAt consume-on-fail", () => {
+  it("moves the piece from tray to droppedPieceIds when the drop lands on an out-of-bounds cell", () => {
+    withSeededRound(12345);
+    const before = useGameStore.getState();
+    // Pick a tray piece (not an anchor) and drop it at a cell well outside
+    // the grid. Every snap-to-legal candidate origin will fail with
+    // out_of_bounds, so the drop is rejected — and the piece must end up in
+    // droppedPieceIds, not in trayPieceIds.
+    const targetId = before.trayPieceIds[0];
+    expect(before.droppedPieceIds).not.toContain(targetId);
+    expect(before.trayPieceIds).toContain(targetId);
+
+    useGameStore.getState().placePieceAt(targetId, before.grid.cols + 5, before.grid.rows + 5);
+
+    const after = useGameStore.getState();
+    // Tray no longer holds it.
+    expect(after.trayPieceIds).not.toContain(targetId);
+    // Dropped now holds it, at the tail of the list.
+    expect(after.droppedPieceIds).toContain(targetId);
+    expect(after.droppedPieceIds[after.droppedPieceIds.length - 1]).toBe(targetId);
+    // Grid placements unchanged.
+    expect(after.grid.placements.length).toBe(before.grid.placements.length);
+    // A 'warn' message landed in the queue.
+    const warns = after.messages.filter((m) => m.kind === "warn");
+    expect(warns.length).toBeGreaterThan(0);
+  });
+
+  it("resetPlacements restores every dropped piece to the tray", () => {
+    withSeededRound(12345);
+    // Drop the first two tray pieces by aiming way off-grid.
+    const initialTray = useGameStore.getState().trayPieceIds.slice();
+    const dropA = initialTray[0];
+    const dropB = initialTray[1];
+    useGameStore.getState().placePieceAt(dropA, 999, 999);
+    useGameStore.getState().placePieceAt(dropB, 999, 999);
+    const afterDrop = useGameStore.getState();
+    expect(afterDrop.droppedPieceIds).toContain(dropA);
+    expect(afterDrop.droppedPieceIds).toContain(dropB);
+
+    useGameStore.getState().resetPlacements();
+    const afterReset = useGameStore.getState();
+    // Dropped basket emptied.
+    expect(afterReset.droppedPieceIds).toEqual([]);
+    // Both pieces back in the tray.
+    expect(afterReset.trayPieceIds).toContain(dropA);
+    expect(afterReset.trayPieceIds).toContain(dropB);
+    // Tray order matches the round's canonical ordering.
+    expect(afterReset.trayPieceIds).toEqual(
+      useGameStore.getState().round.trayPieces.map((p) => p.id),
+    );
   });
 });
 

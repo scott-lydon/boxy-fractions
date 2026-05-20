@@ -16,16 +16,24 @@ interface StoreData {
   grid: Grid;
   // pieces still available in the tray (subset of round.trayPieces, minus those placed)
   trayPieceIds: string[];
+  // pieces the student dropped on the grid in a rules-rejected spot. They are
+  // visibly preserved in the "Dropped" basket as a record of what was spent
+  // and why, so the student can compare misplaced pieces against the rules
+  // panel. Order is chronological: most recent at the tail. Once a piece is
+  // dropped it stays dropped for the rest of the round (resetPlacements
+  // restores them when retrying the same puzzle).
+  droppedPieceIds: string[];
   messages: GameMessage[];
   messageCounter: number;
   placementCounter: number;
   revealedSolution: boolean;
   submitted: boolean;
   score: number; // 0..100
-  // Ceiling % the player COULD reach if every piece in the round were placed.
-  // Round generator removes void tiles; this caps fill at < 100% so the player
-  // can see up-front what "perfect" looks like for this puzzle.
-  maxPossiblePercent: number;
+  // Box-count totals exposed for the toolbar's fraction readout. Cheaper than
+  // recomputing every render and keeps "filled" and "possible" using the same
+  // denominator (total grid cells) so the two readouts compare cleanly.
+  totalCells: number; // grid.cols * grid.rows
+  possibleCells: number; // sum of every solution placement's squareCount
 }
 
 interface StoreActions {
@@ -82,10 +90,13 @@ const DEFAULT_MAX_PIECE_SIZE = 5;
 
 /**
  * The most you could ever fill: every solution piece placed. The generator
- * voids some tiles by design, so this is the puzzle's ceiling (< 100% on most
- * rounds). Surfaced live in the toolbar so the player knows the target.
+ * voids some tiles by design, so this is the puzzle's ceiling (cells < total
+ * on most rounds). Surfaced live in the toolbar so the student knows the
+ * target. Returned as a raw cell count so the toolbar can render it as a
+ * fraction (X / total) — younger students may not yet be working with
+ * percentages, so cells-out-of-cells reads more naturally than "37%".
  */
-function maxPossiblePercentFor(round: GeneratedRound): number {
+function possibleCellsFor(round: GeneratedRound): number {
   let cells = 0;
   for (const p of round.solutionPlacements) cells += p.piece.squareCount;
   const total = round.cols * round.rows;
@@ -95,7 +106,7 @@ function maxPossiblePercentFor(round: GeneratedRound): number {
         `Bug: a round was generated with empty dimensions. Check the round generator inputs.`,
     );
   }
-  return Math.round((cells / total) * 100);
+  return cells;
 }
 
 const initialData = (): StoreData => {
@@ -108,13 +119,15 @@ const initialData = (): StoreData => {
     round,
     grid: gridFromRound(round),
     trayPieceIds: round.trayPieces.map((p) => p.id),
+    droppedPieceIds: [],
     messages: [],
     messageCounter: 0,
     placementCounter: 0,
     revealedSolution: false,
     submitted: false,
     score: 0,
-    maxPossiblePercent: maxPossiblePercentFor(round),
+    totalCells: round.cols * round.rows,
+    possibleCells: possibleCellsFor(round),
   };
 };
 
@@ -146,11 +159,12 @@ export const useGameStore = create<GameStore>((set) => ({
       const snap = findBestOrigin(piece, { col: gridCol, row: gridRow }, s.grid, s.round.rules);
       if (!snap.ok) {
         // Consume the piece on incorrect placement: the student dropped it on
-        // the grid in a spot the rules reject, so the piece is spent. This is
-        // the design switch from "every wrong drop bounces back to the tray
-        // and the student keeps trying until something sticks" to "every drop
-        // is a commitment — read the rules before you let go." The lesson is
-        // about reasoning before placing, not exhaustive retry-until-pass.
+        // the grid in a spot the rules reject, so the piece is spent. The
+        // piece moves from the tray to the visible "Dropped" basket so the
+        // student can see exactly what they spent and reason about why. This
+        // is the design switch from "every wrong drop bounces back to the
+        // tray and the student keeps trying until something sticks" to "every
+        // drop is a commitment — read the rules before you let go."
         //
         // Only on-grid rejections consume. A drag that releases outside the
         // grid entirely never reaches placePieceAt (DraggablePiece returns
@@ -158,8 +172,9 @@ export const useGameStore = create<GameStore>((set) => ({
         // way, releasing a piece you didn't really mean to drop (mid-thought,
         // dragging it off the side, etc.) doesn't burn it.
         const newTray = s.trayPieceIds.filter((id) => id !== pieceId);
+        const newDropped = [...s.droppedPieceIds, pieceId];
         const consumed = appendMessage(s, "warn", consumedReason(snap.reason));
-        return { ...consumed, trayPieceIds: newTray };
+        return { ...consumed, trayPieceIds: newTray, droppedPieceIds: newDropped };
       }
       // Placed-wins cleanup: at every seam where the new piece's color
       // differs from the placed neighbor's, the new piece's triangle gets
@@ -226,13 +241,15 @@ export const useGameStore = create<GameStore>((set) => ({
         round,
         grid: gridFromRound(round),
         trayPieceIds: round.trayPieces.map((p) => p.id),
+        droppedPieceIds: [],
         messages: [],
         messageCounter: 0,
         placementCounter: 0,
         revealedSolution: false,
         submitted: false,
         score: 0,
-        maxPossiblePercent: maxPossiblePercentFor(round),
+        totalCells: round.cols * round.rows,
+        possibleCells: possibleCellsFor(round),
       };
     });
   },
@@ -268,14 +285,21 @@ export const useGameStore = create<GameStore>((set) => ({
   },
 
   resetPlacements: () => {
-    // Retry the SAME puzzle. Pulls every non-anchor placement off the grid,
-    // dumps the pieces back into the tray, and clears any terminal state so
-    // the player can try for a higher score. The anchor and the rule set stay
-    // intact — that's what makes this a retry, not a "new round" (which
-    // generates a fresh puzzle with new pieces and rules).
+    // Retry the SAME puzzle. Pulls every non-anchor placement off the grid
+    // AND every dropped (consumed) piece out of the Dropped basket, putting
+    // both kinds back into the tray. Clears terminal state so the student
+    // can try for a higher score. The anchor and the rule set stay intact —
+    // that's what makes this a retry, not a "new round" (which generates a
+    // fresh puzzle with new pieces and rules).
     //
-    // Score, messages, and counters all reset because they describe a run, and
-    // the player is starting a new run on the same board.
+    // The Dropped basket exists precisely so the student can see what they
+    // spent and reason about why. Reset undoes that spending so they can
+    // approach the same puzzle with fresh attempts; without restoring
+    // dropped pieces here, "Reset" would feel like a partial undo and
+    // contradict the "retry the same puzzle" mental model.
+    //
+    // Score, messages, and counters all reset because they describe a run,
+    // and the student is starting a new run on the same board.
     set((s) => {
       const anchors = s.grid.placements.filter((p) => p.anchor);
       const removedIds: string[] = [];
@@ -284,15 +308,18 @@ export const useGameStore = create<GameStore>((set) => ({
       }
       const newGrid = new Grid(s.grid.cols, s.grid.rows, anchors);
       // Rebuild the tray from the round's full tray-piece list rather than
-      // appending removed ids — that way two consecutive resets cannot leak
-      // duplicate ids and the order matches a fresh round.
-      const trayPieceIds = s.round.trayPieces
-        .map((p) => p.id)
-        .filter((id) => removedIds.includes(id) || s.trayPieceIds.includes(id));
+      // appending removed/dropped ids — that way two consecutive resets
+      // cannot leak duplicate ids and the order matches a fresh round.
+      const aliveOrReclaimed = (id: string): boolean =>
+        removedIds.includes(id) ||
+        s.trayPieceIds.includes(id) ||
+        s.droppedPieceIds.includes(id);
+      const trayPieceIds = s.round.trayPieces.map((p) => p.id).filter(aliveOrReclaimed);
       return {
         ...s,
         grid: newGrid,
         trayPieceIds,
+        droppedPieceIds: [],
         messages: [],
         messageCounter: 0,
         placementCounter: 0,
