@@ -3,6 +3,7 @@ import { Grid } from "../domain/Grid";
 import { generateRound, gridFromRound, type GeneratedRound } from "../domain/Generator";
 import type { Piece } from "../domain/Piece";
 import type { Placement } from "../domain/Grid";
+import type { Rule } from "../domain/Rule";
 
 export interface GameMessage {
   readonly id: string;
@@ -110,16 +111,22 @@ export const useGameStore = create<GameStore>((set) => ({
       if (!s.trayPieceIds.includes(pieceId)) {
         return appendMessage(s, "warn", `Piece ${pieceId} is no longer in the tray.`);
       }
-      const result = s.grid.canPlace(piece, { col: gridCol, row: gridRow }, s.round.rules);
-      if (!result.ok) {
-        const reason = explainReason(result);
-        return appendMessage(s, "warn", reason);
+      // (gridCol, gridRow) is the cell the pointer was over on release, NOT the
+      // piece's (0,0) origin. Try every local cell of the piece as the hot-spot
+      // and pick the legal origin whose piece-centroid lands closest to that
+      // drop cell. This eliminates the false "out of bounds" / "spot already
+      // taken" errors that fired when a multi-cell piece's (0,0) corner
+      // happened to land off-grid or on the anchor even though the visual
+      // drop was on a valid empty cell.
+      const snap = findBestOrigin(piece, { col: gridCol, row: gridRow }, s.grid, s.round.rules);
+      if (!snap.ok) {
+        return appendMessage(s, "warn", softReason(snap.reason));
       }
       const placementId = `placement-${s.placementCounter + 1}`;
       const placement: Placement = {
         placementId,
         piece,
-        origin: { col: gridCol, row: gridRow },
+        origin: snap.origin,
         anchor: false,
       };
       const newGrid = s.grid.withPlacement(placement);
@@ -131,7 +138,7 @@ export const useGameStore = create<GameStore>((set) => ({
         placementCounter: s.placementCounter + 1,
       };
       if (newTray.length === 0) {
-        next = appendMessage(next, "win", "You placed every piece! Hit Submit to score.");
+        next = appendMessage(next, "win", "Every piece placed. Tap Submit to score.");
       }
       return next;
     });
@@ -237,23 +244,88 @@ function pieceById(round: GeneratedRound, id: string): Piece | undefined {
   return undefined;
 }
 
-function explainReason(
-  r: Exclude<ReturnType<Grid["canPlace"]>, { ok: true }>,
-): string {
+/**
+ * Snap-to-legal placement.
+ *
+ * The drop tells us only what cell the pointer was over. The piece is multi-
+ * cell; the player's intent is "put the piece such that this cell is part of
+ * it." So we try every local cell of the piece as the hot-spot. For each
+ * candidate, the piece's origin would be `dropCell - localCell`. We pick the
+ * candidate whose canPlace returns ok AND whose piece-centroid lands closest
+ * to the drop cell (that matches the player's visual intent).
+ *
+ * If no candidate is legal, we collect the rejection reasons and pick the
+ * most useful one to surface (rule mismatch outranks out-of-bounds, since the
+ * math is the thing the player should think about). Returns the chosen reason
+ * for the caller to phrase.
+ */
+type CanPlaceFail = Exclude<ReturnType<Grid["canPlace"]>, { ok: true }>;
+type SnapResult =
+  | { ok: true; origin: { col: number; row: number } }
+  | { ok: false; reason: CanPlaceFail };
+
+function findBestOrigin(
+  piece: Piece,
+  dropCell: { col: number; row: number },
+  grid: Grid,
+  rules: readonly Rule[],
+): SnapResult {
+  let centroidCol = 0;
+  let centroidRow = 0;
+  for (const c of piece.polyomino.cells) {
+    centroidCol += c.col;
+    centroidRow += c.row;
+  }
+  centroidCol /= piece.polyomino.cells.length;
+  centroidRow /= piece.polyomino.cells.length;
+
+  let bestOk: { origin: { col: number; row: number }; dist: number } | null = null;
+  const fails: CanPlaceFail[] = [];
+
+  for (const local of piece.polyomino.cells) {
+    const origin = { col: dropCell.col - local.col, row: dropCell.row - local.row };
+    const r = grid.canPlace(piece, origin, rules);
+    if (r.ok) {
+      // Distance from the piece's centroid (in absolute grid coords) to the
+      // drop cell. Smaller = the piece feels visually centered on the drop.
+      const absCentroidCol = origin.col + centroidCol;
+      const absCentroidRow = origin.row + centroidRow;
+      const dx = absCentroidCol - dropCell.col;
+      const dy = absCentroidRow - dropCell.row;
+      const dist = dx * dx + dy * dy;
+      if (!bestOk || dist < bestOk.dist) bestOk = { origin, dist };
+    } else {
+      fails.push(r);
+    }
+  }
+  if (bestOk) return { ok: true, origin: bestOk.origin };
+
+  // Rank rejection reasons so we surface the most-useful one. rule_mismatch is
+  // about the math (the actual puzzle), so it outranks geometric reasons.
+  const priority: Record<CanPlaceFail["reason"], number> = {
+    rule_mismatch: 0,
+    overlap: 1,
+    no_adjacency: 2,
+    out_of_bounds: 3,
+  };
+  fails.sort((a, b) => priority[a.reason] - priority[b.reason]);
+  return { ok: false, reason: fails[0] };
+}
+
+/**
+ * Suggestion-voice copy. Treats every rejection as "try another way" rather
+ * than "you failed." Pedagogical: a 7th-grader sees yellow and reads
+ * "I think it might be another way", not red and "you got it wrong."
+ */
+function softReason(r: CanPlaceFail): string {
   switch (r.reason) {
-    case "out_of_bounds":
-      return "That piece would hang off the edge of the grid. Shift it so all of its boxes land inside.";
-    case "overlap":
-      // Common cause: the player dragged the piece so its TOP-LEFT box landed on
-      // a cell occupied by another piece (often the anchor itself). The whole
-      // piece's footprint has to fall on empty cells — drop the piece offset by
-      // a cell or two so the top-left clears the existing pieces.
-      return `Every box of the piece has to land on an empty cell. Cell (${r.col}, ${r.row}) is already taken — try shifting one cell over.`;
-    case "no_adjacency":
-      return "Pieces must touch another piece. Place this one next to an existing piece.";
     case "rule_mismatch":
-      // Show the bare ratio both ways so the student can match against the
-      // rules panel without having to know which order "counts".
-      return `Those two pieces would meet in a ${r.placedCount}:${r.newCount} ratio. No rule allows that ratio.`;
+      return `I think it might land another way — those two pieces would meet in a ${r.placedCount}:${r.newCount} ratio, and no rule in the panel allows that. Try a different piece, or a spot next to a different piece.`;
+    case "overlap":
+      return "I think it might fit another way — every box of the piece has to land on an empty cell, and at least one of these would overlap. Try a spot a cell over.";
+    case "no_adjacency":
+      return "I think it might fit another way — pieces have to touch one already on the grid. Try a spot next to an existing piece.";
+    case "out_of_bounds":
+      return "I think it might fit another way — at least one box would land off the grid no matter how I align this piece. Try a spot further inside.";
   }
 }
