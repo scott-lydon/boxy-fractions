@@ -2,7 +2,7 @@
 
 A Synthesis-style math tutor for a single lesson: **fraction equivalence**. A 9-year-old can run it on an iPad in Safari and discover that 1/2 = 2/4 = 3/6 by stacking boxes.
 
-Live: https://boxy-fractions.onrender.com
+Live: https://boxy-fractions.pages.dev
 
 Gauntlet Week 4 submission.
 
@@ -30,7 +30,21 @@ App runs on `http://localhost:5173`. Tested on Chrome, Safari, and iPad Safari.
 npm run build
 ```
 
-Builds to `dist/`. `render.yaml` deploys this on push to `main` (manual deploy trigger via the Render dashboard for now; auto-deploy returns once we wire the Render GitHub App).
+Builds to `dist/`, which is published to Cloudflare Pages:
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name boxy-fractions --branch main
+```
+
+Moved off Render on 2026-09-03. That account was suspended for non-payment, so
+`https://boxy-fractions.onrender.com` returns 503 and is not coming back. The
+`render.yaml` in this repository is kept only as a record of how the site used to
+be built; nothing reads it any more.
+
+Cloudflare Pages is free for this, with no per-site charge, which is the point:
+this is a graded submission that has to keep resolving long after anyone stops
+paying attention to it.
 
 ## Technical approach
 
