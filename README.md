@@ -37,8 +37,9 @@ npm run build
 npx wrangler pages deploy dist --project-name boxy-fractions --branch main
 ```
 
-Moved off Render on 2026-09-03. That account was suspended for non-payment, so
-`https://boxy-fractions.onrender.com` returns 503 and is not coming back. The
+Moved off Render on 2026-09-03. That account was suspended for non-payment and
+the service was then deleted, so `https://boxy-fractions.onrender.com` returns
+404 and is not coming back. The
 `render.yaml` in this repository is kept only as a record of how the site used to
 be built; nothing reads it any more.
 
