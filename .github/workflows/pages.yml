@@ -1,0 +1,53 @@
+# Publishes the graded build to GitHub Pages.
+#
+# WHY THIS EXISTS. This project used to be served from Render at
+# boxy-fractions.onrender.com. That service was deleted on 2026-09-09 when the
+# Render account was wound down, so every citation of that URL now returns 404.
+# The graded artefact itself is still worth resolving to something, so it is
+# rebuilt here and served from GitHub Pages instead.
+#
+# The Vite base path is passed on the command line rather than written into
+# vite.config.ts, so the graded source is unchanged by the move.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm ci || npm install
+      - name: Build
+        run: npx vite build --base=/boxy-fractions/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
